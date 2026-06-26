@@ -8,9 +8,11 @@ import BaseButton from '../../../components/ui/BaseButton.vue';
 import BaseInput from '../../../components/ui/BaseInput.vue';
 import { authApi } from '../../../api/auth.api.js';
 import { useAuthStore } from '../../../stores/auth.store.js';
+import { useUserStore } from '../../../stores/user.store.js';
 
 const route = useRoute();
 const authStore = useAuthStore();
+const userStore = useUserStore();
 
 const verifying = ref(true);
 const success = ref(false);
@@ -34,6 +36,14 @@ const verifyToken = async () => {
     verifying.value = false;
     success.value = true;
     message.value = response.message || 'Your email address has been successfully verified! You can now access all premium features.';
+    
+    // Proactively update local store states so the UI reflects verification instantly
+    if (authStore.user) {
+      authStore.user.emailVerified = true;
+    }
+    if (userStore.profile) {
+      userStore.profile.emailVerified = true;
+    }
   } catch (err: any) {
     verifying.value = false;
     success.value = false;

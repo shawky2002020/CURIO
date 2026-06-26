@@ -1,14 +1,57 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 import { useAuthStore } from '../stores/auth.store.js';
 import { useToastStore } from '../stores/toast.store.js';
 import { useRouter, useRoute } from 'vue-router';
 import { Lock, Sparkles } from '@lucide/vue';
+import { authApi } from '../api/auth.api.js';
 
 const authStore = useAuthStore();
 const toastStore = useToastStore();
 const router = useRouter();
 const route = useRoute();
+
+const resending = ref(false);
+const resendCooldown = ref(0);
+let cooldownInterval: number | null = null;
+
+const startCooldown = () => {
+  resendCooldown.value = 60;
+  cooldownInterval = window.setInterval(() => {
+    if (resendCooldown.value > 0) {
+      resendCooldown.value--;
+    } else {
+      stopCooldown();
+    }
+  }, 1000);
+};
+
+const stopCooldown = () => {
+  if (cooldownInterval) {
+    clearInterval(cooldownInterval);
+    cooldownInterval = null;
+  }
+};
+
+onUnmounted(() => {
+  stopCooldown();
+});
+
+const handleResendVerification = async () => {
+  if (!authStore.user?.email || resending.value || resendCooldown.value > 0) return;
+  
+  resending.value = true;
+  try {
+    const response = await authApi.resendVerification(authStore.user.email);
+    toastStore.success(response.message || 'Verification link dispatched successfully.');
+    startCooldown();
+  } catch (err: any) {
+    const errorMsg = err.response?.data?.message || 'Failed to dispatch verification link.';
+    toastStore.error(errorMsg);
+  } finally {
+    resending.value = false;
+  }
+};
 
 interface NavItem {
   label: string;
@@ -44,6 +87,28 @@ const handleLogout = async () => {
 
 <template>
   <div class="main-layout">
+    <!-- Premium Verification Banner -->
+    <div 
+      v-if="authStore.isAuthenticated && authStore.user && !authStore.user.emailVerified" 
+      class="verification-banner"
+      role="alert"
+    >
+      <div class="banner-container">
+        <span class="banner-text">
+          Your Curio registry is currently unverified. Let's establish authenticity to secure your member privileges.
+        </span>
+        <button 
+          @click="handleResendVerification" 
+          :disabled="resendCooldown > 0 || resending"
+          class="banner-cta"
+        >
+          <span v-if="resending">Dispatching...</span>
+          <span v-else-if="resendCooldown > 0">Resend in {{ resendCooldown }}s</span>
+          <span v-else>Dispatch Verification Link</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Header Navigation -->
     <header class="app-header">
       <div class="header-container">
@@ -390,5 +455,77 @@ const handleLogout = async () => {
   display: inline-block;
   vertical-align: -2px;
   margin-right: 4px;
+}
+
+/* Premium Verification Banner */
+.verification-banner {
+  background: linear-gradient(135deg, var(--color-primary-soft), var(--color-primary));
+  color: var(--color-bg);
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 12px 24px;
+  border-bottom: 2px solid var(--color-accent);
+  position: relative;
+  z-index: 101;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(23, 20, 63, 0.15);
+  animation: slideDown 0.4s var(--ease-spring);
+}
+
+.banner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+}
+
+.banner-text {
+  letter-spacing: -0.01em;
+  opacity: 0.95;
+}
+
+.banner-cta {
+  background-color: var(--color-accent);
+  color: var(--color-surface);
+  border: none;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all var(--duration-base) var(--ease-spring);
+  box-shadow: 0 4px 10px rgba(255, 107, 53, 0.25);
+}
+
+.banner-cta:hover:not(:disabled) {
+  background-color: var(--color-bg);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+.banner-cta:disabled {
+  background-color: var(--color-bg-alt);
+  color: var(--color-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.7;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 </style>

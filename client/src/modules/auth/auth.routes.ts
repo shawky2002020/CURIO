@@ -29,7 +29,6 @@ export const authRoutes: RouteRecordRaw[] = [
     path: 'reset-password',
     name: 'reset-password',
     component: () => import('./pages/ResetPasswordPage.vue'),
-    beforeEnter: guestGuard,
   },
 ];
 
