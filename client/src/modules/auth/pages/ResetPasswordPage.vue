@@ -6,6 +6,8 @@ import BaseInput from '../../../components/ui/BaseInput.vue';
 import BaseButton from '../../../components/ui/BaseButton.vue';
 import BaseAlert from '../../../components/ui/BaseAlert.vue';
 import { authApi } from '../../../api/auth.api.js';
+import { useToastStore } from '../../../stores/toast.store.js';
+import { useAuthStore } from '../../../stores/auth.store.js';
 
 const password = ref('');
 const confirmPassword = ref('');
@@ -18,11 +20,15 @@ const token = ref('');
 
 const router = useRouter();
 const route = useRoute();
+const toastStore = useToastStore();
+const authStore = useAuthStore();
 
 onMounted(() => {
+  authStore.error = null; // Clear any stale global auth errors on load
   const t = route.query.token as string;
   if (!t) {
     globalError.value = 'Security token is missing or invalid. Please request a new recovery link.';
+    toastStore.error('Security token is missing.');
   } else {
     token.value = t;
   }
@@ -74,6 +80,8 @@ const handleReset = async () => {
     success.value = true;
     globalError.value = '';
     
+    toastStore.success('Password updated successfully. Redirecting to login...');
+    
     // Redirect to login after brief delay
     setTimeout(() => {
       router.push({ name: 'login' });
@@ -81,7 +89,9 @@ const handleReset = async () => {
   } catch (err: any) {
     loading.value = false;
     success.value = false;
-    globalError.value = err.response?.data?.message || 'Failed to update password. Link may be expired.';
+    const errorMsg = err.response?.data?.message || 'Failed to update password. Link may be expired.';
+    globalError.value = errorMsg;
+    toastStore.error(errorMsg);
   }
 };
 </script>

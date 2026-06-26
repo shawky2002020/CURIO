@@ -1,17 +1,26 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import AuthCard from '../components/AuthCard.vue';
 import BaseInput from '../../../components/ui/BaseInput.vue';
 import BaseButton from '../../../components/ui/BaseButton.vue';
 import BaseAlert from '../../../components/ui/BaseAlert.vue';
 import { validateEmail } from '../../../utils/validation.js';
 import { authApi } from '../../../api/auth.api.js';
+import { useToastStore } from '../../../stores/toast.store.js';
+import { useAuthStore } from '../../../stores/auth.store.js';
 
 const email = ref('');
 const emailError = ref('');
 const loading = ref(false);
 const message = ref('');
 const success = ref(false);
+
+const toastStore = useToastStore();
+const authStore = useAuthStore();
+
+onMounted(() => {
+  authStore.error = null; // Clear any stale global auth errors on load
+});
 
 const validateForm = () => {
   if (!email.value) {
@@ -36,11 +45,15 @@ const handleRequestReset = async () => {
     const response = await authApi.forgotPassword(email.value);
     loading.value = false;
     success.value = true;
-    message.value = response.message || 'A secure password recovery link has been dispatched to your email address.';
+    const successMsg = response.message || 'A secure password recovery link has been dispatched to your email address.';
+    message.value = successMsg;
+    toastStore.success(successMsg);
   } catch (err: any) {
     loading.value = false;
     success.value = false;
-    message.value = err.response?.data?.message || 'Failed to request password reset. Please try again.';
+    const errorMsg = err.response?.data?.message || 'Failed to request password reset. Please try again.';
+    message.value = errorMsg;
+    toastStore.error(errorMsg);
   }
 };
 </script>
