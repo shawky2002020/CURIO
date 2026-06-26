@@ -55,7 +55,7 @@ onMounted(() => {
               width: gBtnContainer.value.clientWidth || 340,
               shape: 'square',
               text: 'continue_with',
-              logo_alignment: 'center'
+              logo_alignment: 'left'
             }
           );
         }
