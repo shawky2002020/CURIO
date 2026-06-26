@@ -16,6 +16,16 @@ export const verifyGoogleCredential = async (credential: string): Promise<Google
     throw new ApiError(400, 'Google credential token is required.', 'BAD_REQUEST');
   }
 
+  // Development bypass to allow testing Google OAuth without credentials or internet
+  if (env.NODE_ENV === 'development' && credential === 'mock_google_credential_token') {
+    console.log('[Google OAuth] Dev simulation bypass activated.');
+    return {
+      email: 'curator.test@gmail.com',
+      name: 'Curator Test (Google)',
+      googleId: 'mock_google_user_id_123456',
+    };
+  }
+
   // Check if Google Client ID is configured
   const isGoogleConfigured = env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_ID !== 'replace_me';
 
