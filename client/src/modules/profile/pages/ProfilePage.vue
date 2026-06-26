@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, computed } from 'vue';
 import { useUserStore } from '../../../stores/user.store.js';
 import { useAuthStore } from '../../../stores/auth.store.js';
 import { useRouter } from 'vue-router';
@@ -26,34 +26,49 @@ const handleLogout = async () => {
   await authStore.logout();
   router.push({ name: 'login' });
 };
+
+// Compute user initials fallback for avatar
+const userInitials = computed(() => {
+  if (!userStore.profile?.fullName) return 'CU';
+  return userStore.profile.fullName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
+});
 </script>
 
 <template>
   <div class="profile-dashboard">
     <header class="dashboard-header">
-      <span class="dashboard-eyebrow">PORTAL // REGISTRY DIRECTORY</span>
-      <h1 class="dashboard-title">Collector Portal</h1>
-      <p class="dashboard-subtitle">Review your secure registry, membership status, and archive metrics.</p>
+      <span class="dashboard-eyebrow">PORTAL MEMBER REGISTRY</span>
+      <h1 class="dashboard-title">Member Hub</h1>
+      <p class="dashboard-subtitle">Review your secure account settings, membership status, and archive metrics.</p>
     </header>
 
     <BaseLoader v-if="userStore.loading" text="Retrieving registry credentials..." />
     <BaseAlert v-else-if="userStore.error" type="error" :message="userStore.error" />
 
-    <div v-else-if="userStore.profile" class="dashboard-grid">
+    <div v-else-if="userStore.profile" class="dashboard-grid motion-scale-in">
       <!-- 1. Profile Summary Card -->
       <section class="summary-card" aria-label="Profile Summary">
         <div class="avatar-container">
           <div class="avatar-frame">
             <UserAvatar
+              v-if="userStore.profile.avatarUrl"
               :avatarUrl="userStore.profile.avatarUrl"
               :fullName="userStore.profile.fullName"
               size="lg"
             />
+            <div v-else class="avatar-fallback">
+              {{ userInitials }}
+            </div>
           </div>
         </div>
         
         <div class="meta-container">
-          <span class="member-serial">MEMBER ID // AE-{{ userStore.profile.id ? userStore.profile.id.substring(0, 8).toUpperCase() : 'MEMBER' }}</span>
+          <span class="member-serial">MEMBER ID // {{ userStore.profile.id ? userStore.profile.id.substring(0, 8).toUpperCase() : 'MEMBER' }}</span>
           <h2 class="user-name">{{ userStore.profile.fullName }}</h2>
           <div class="badges-row">
             <span :class="['badge', `badge-${userStore.profile.role}`]">
@@ -68,11 +83,11 @@ const handleLogout = async () => {
 
       <!-- 2. Detailed Profile Fields -->
       <section class="details-section" aria-label="Account Information">
-        <h3 class="section-heading">Archive Credentials</h3>
+        <h3 class="section-heading">Account Information</h3>
         
         <div class="details-grid">
           <!-- Email Field -->
-          <div class="detail-field">
+          <div class="detail-card">
             <span class="field-label">Registry Email</span>
             <div class="field-value-row">
               <span class="field-value">{{ userStore.profile.email || 'Not provided' }}</span>
@@ -80,13 +95,13 @@ const handleLogout = async () => {
                 v-if="userStore.profile.email"
                 :class="['status-pill', userStore.profile.emailVerified ? 'pill-verified' : 'pill-unverified']"
               >
-                {{ userStore.profile.emailVerified ? 'AUTHENTICATED' : 'UNVERIFIED' }}
+                {{ userStore.profile.emailVerified ? 'Verified' : 'Unverified' }}
               </span>
             </div>
           </div>
 
           <!-- Phone Field -->
-          <div class="detail-field">
+          <div class="detail-card">
             <span class="field-label">Secure Phone</span>
             <div class="field-value-row">
               <span class="field-value">{{ userStore.profile.phone || 'Not provided' }}</span>
@@ -94,19 +109,20 @@ const handleLogout = async () => {
                 v-if="userStore.profile.phone"
                 :class="['status-pill', userStore.profile.phoneVerified ? 'pill-verified' : 'pill-unverified']"
               >
-                {{ userStore.profile.phoneVerified ? 'AUTHENTICATED' : 'UNVERIFIED' }}
+                {{ userStore.profile.phoneVerified ? 'Verified' : 'Unverified' }}
               </span>
             </div>
           </div>
 
           <!-- Login Details -->
-          <div class="detail-field">
-            <span class="field-label">Handshake Protocol</span>
-            <span class="field-value capitalize">{{ userStore.profile.provider }}</span>
+          <div class="detail-card">
+            <span class="field-label">Login Method</span>
+            <span class="field-value capitalize">{{ userStore.profile.provider }} Authentication</span>
           </div>
 
-          <div v-if="userStore.profile.lastLoginAt" class="detail-field">
-            <span class="field-label">Last Successful Handshake</span>
+          <!-- Last Login -->
+          <div v-if="userStore.profile.lastLoginAt" class="detail-card">
+            <span class="field-label">Last Session Handshake</span>
             <span class="field-value monospace-val">
               {{ new Date(userStore.profile.lastLoginAt).toLocaleString() }}
             </span>
@@ -116,11 +132,11 @@ const handleLogout = async () => {
         <!-- Dashboard Controls -->
         <footer class="details-footer">
           <router-link to="/profile/edit" class="edit-link">
-            <BaseButton variant="primary">Edit Registry</BaseButton>
+            <BaseButton variant="primary">Edit Profile</BaseButton>
           </router-link>
           
           <BaseButton variant="secondary" @click="handleLogout" class="btn-dashboard-logout">
-            Terminate Session
+            Log Out
           </BaseButton>
         </footer>
       </section>
@@ -137,32 +153,31 @@ const handleLogout = async () => {
 .dashboard-header {
   margin-bottom: 40px;
   text-align: left;
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 24px;
 }
 
 .dashboard-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.15em;
-  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--color-accent);
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .dashboard-title {
   font-family: var(--font-heading);
   font-size: 2.5rem;
-  font-weight: 400;
-  color: var(--color-text-h);
+  font-weight: 700;
+  color: var(--color-primary);
   margin: 0 0 8px 0;
   letter-spacing: -0.02em;
 }
 
 .dashboard-subtitle {
   font-family: var(--font-sans);
-  font-size: 0.95rem;
-  color: var(--color-text);
+  font-size: 1rem;
+  color: var(--color-muted);
   margin: 0;
 }
 
@@ -172,28 +187,17 @@ const handleLogout = async () => {
   gap: 32px;
 }
 
-/* Summary Card Style (Brutalist Curation Frame) */
+/* Summary Card Style */
 .summary-card {
   display: flex;
   align-items: center;
   gap: 32px;
   background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
   padding: 32px;
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-card);
   box-sizing: border-box;
-  position: relative;
-}
-
-.summary-card::before {
-  content: '+';
-  position: absolute;
-  top: -9px;
-  left: -5px;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  color: var(--color-primary);
-  opacity: 0.6;
 }
 
 .avatar-container {
@@ -201,9 +205,23 @@ const handleLogout = async () => {
 }
 
 .avatar-frame {
-  border: 1px solid var(--color-primary);
-  padding: 6px;
-  display: inline-flex;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 4px solid var(--color-accent-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background-color: var(--color-bg-alt);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.avatar-fallback {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--color-primary);
 }
 
 .meta-container {
@@ -215,70 +233,73 @@ const handleLogout = async () => {
 
 .member-serial {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.1em;
-  color: var(--color-primary);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+  font-weight: 600;
 }
 
 .user-name {
   margin: 0;
   font-family: var(--font-heading);
-  font-size: 2rem;
-  font-weight: 400;
-  color: var(--color-text-h);
+  font-size: 2.1rem;
+  font-weight: 700;
+  color: var(--color-primary);
   line-height: 1.1;
+  letter-spacing: -0.02em;
 }
 
 .badges-row {
   display: flex;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .badge {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 4px 12px;
-  border: 1px solid transparent;
+  letter-spacing: 0.05em;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  border: 1px solid var(--color-border);
 }
 
-/* Badges coloring */
+/* Playful Badges */
 .badge-customer {
-  border-color: rgba(197, 168, 128, 0.3);
-  background-color: rgba(197, 168, 128, 0.05);
-  color: var(--color-primary);
+  background-color: rgba(255, 107, 53, 0.08);
+  color: var(--color-accent);
+  border-color: rgba(255, 107, 53, 0.15);
 }
 .badge-seller {
-  border-color: rgba(143, 92, 56, 0.3);
-  background-color: rgba(143, 92, 56, 0.05);
-  color: var(--color-accent-light);
+  background-color: rgba(255, 190, 11, 0.1);
+  color: #b27b00;
+  border-color: rgba(255, 190, 11, 0.2);
 }
 .badge-admin {
-  border-color: rgba(239, 68, 68, 0.3);
-  background-color: rgba(239, 68, 68, 0.05);
-  color: var(--color-error);
+  background-color: rgba(229, 72, 77, 0.08);
+  color: var(--color-danger);
+  border-color: rgba(229, 72, 77, 0.15);
 }
 .badge-active {
-  border-color: rgba(16, 185, 129, 0.3);
-  background-color: rgba(16, 185, 129, 0.05);
-  color: var(--color-success);
+  background-color: rgba(61, 220, 151, 0.1);
+  color: #1b8e5c;
+  border-color: rgba(61, 220, 151, 0.2);
 }
 .badge-blocked {
-  border-color: rgba(239, 68, 68, 0.5);
-  background-color: rgba(239, 68, 68, 0.1);
-  color: var(--color-error);
+  background-color: rgba(229, 72, 77, 0.1);
+  color: var(--color-danger);
 }
 
 /* Details Section Style */
 .details-section {
   background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
   padding: 40px;
-  box-shadow: var(--shadow-soft);
+  box-shadow: var(--shadow-card);
   box-sizing: border-box;
   text-align: left;
 }
@@ -287,73 +308,81 @@ const handleLogout = async () => {
   margin: 0 0 32px 0;
   font-family: var(--font-heading);
   font-size: 1.6rem;
-  font-weight: 400;
-  color: var(--color-text-h);
-  border-bottom: 1px solid var(--color-border);
+  font-weight: 700;
+  color: var(--color-primary);
+  border-bottom: 2px solid var(--color-bg-alt);
   padding-bottom: 12px;
 }
 
 .details-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 24px;
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 32px;
-  margin-bottom: 32px;
+  margin-bottom: 40px;
+  
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
 }
 
-.detail-field {
+.detail-card {
+  background-color: var(--color-bg-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .field-label {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 500;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
   color: var(--color-muted);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.05em;
 }
 
 .field-value {
   font-family: var(--font-sans);
-  font-size: 1.05rem;
-  font-weight: 500;
-  color: var(--color-text-h);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-primary);
 }
 
 .monospace-val {
   font-family: var(--font-mono) !important;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 .field-value-row {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
 }
 
 .status-pill {
-  font-family: var(--font-mono);
-  font-size: 0.6rem;
-  font-weight: 500;
-  padding: 2px 8px;
-  border: 1px solid transparent;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 99px;
   letter-spacing: 0.05em;
+  border: 1px solid transparent;
 }
 
 .pill-verified {
-  border-color: rgba(16, 185, 129, 0.3);
-  color: var(--color-success);
-  background-color: rgba(16, 185, 129, 0.05);
+  background-color: rgba(61, 220, 151, 0.12);
+  color: #1b8e5c;
+  border-color: rgba(61, 220, 151, 0.2);
 }
 .pill-unverified {
-  border-color: rgba(239, 68, 68, 0.3);
-  color: var(--color-error);
-  background-color: rgba(239, 68, 68, 0.05);
+  background-color: rgba(229, 72, 77, 0.1);
+  color: var(--color-danger);
+  border-color: rgba(229, 72, 77, 0.15);
 }
 
 .capitalize {
@@ -362,7 +391,9 @@ const handleLogout = async () => {
 
 .details-footer {
   display: flex;
-  gap: 20px;
+  gap: 16px;
+  border-top: 2px solid var(--color-bg-alt);
+  padding-top: 32px;
 }
 
 .edit-link {

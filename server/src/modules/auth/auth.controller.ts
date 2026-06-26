@@ -53,11 +53,23 @@ export class AuthController {
    * Google OAuth login route.
    */
   public googleLogin = asyncHandler(async (req: Request, res: Response) => {
-    // Currently redirects to service boundary error until configured
-    res.status(501).json({
-      success: false,
-      message: 'Google OAuth package is not fully configured on server.',
-      code: 'OAUTH_UNIMPLEMENTED',
+    const { credentialToken } = req.body;
+    const result = await authService.googleLogin(credentialToken);
+
+    res.cookie('refreshToken', result.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Google login successful.',
+      data: {
+        user: result.user,
+        accessToken: result.accessToken,
+      },
     });
   });
 

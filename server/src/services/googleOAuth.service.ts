@@ -9,7 +9,7 @@ interface GoogleUserResult {
 
 /**
  * Google OAuth Service.
- * Verifies the integrity of ID tokens received from the client.
+ * Verifies the integrity of ID tokens received from the client using Google's tokeninfo API.
  */
 export const verifyGoogleCredential = async (credential: string): Promise<GoogleUserResult> => {
   if (!credential) {
@@ -27,33 +27,34 @@ export const verifyGoogleCredential = async (credential: string): Promise<Google
     );
   }
 
-  // In production:
-  // try {
-  //   const { OAuth2Client } = await import('google-auth-library');
-  //   const client = new OAuth2Client(env.GOOGLE_CLIENT_ID);
-  //   const ticket = await client.verifyIdToken({
-  //     idToken: credential,
-  //     audience: env.GOOGLE_CLIENT_ID,
-  //   });
-  //   const payload = ticket.getPayload();
-  //   if (!payload || !payload.sub || !payload.email || !payload.name) {
-  //     throw new ApiError(401, 'Invalid Google ID token payload.', 'INVALID_CREDENTIALS');
-  //   }
-  //   return {
-  //     email: payload.email,
-  //     name: payload.name,
-  //     googleId: payload.sub,
-  //   };
-  // } catch (err) {
-  //   throw new ApiError(401, 'Google token verification failed.', 'INVALID_CREDENTIALS');
-  // }
+  try {
+    // Call Google's token info API to verify the ID Token (JWT)
+    const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+    
+    if (!response.ok) {
+      throw new ApiError(401, 'Google token verification failed.', 'INVALID_CREDENTIALS');
+    }
 
-  // Return a controlled error instead of faking successful login with unverified data
-  throw new ApiError(
-    501,
-    'Google OAuth package is not fully initialized. Complete integration on production environment.',
-    'OAUTH_UNIMPLEMENTED'
-  );
+    const payload = await response.json();
+
+    // Verify audience matches our Client ID to prevent token spoofing/reuse attacks
+    if (payload.aud !== env.GOOGLE_CLIENT_ID) {
+      throw new ApiError(401, 'Google token audience mismatch.', 'INVALID_CREDENTIALS');
+    }
+
+    if (!payload.sub || !payload.email || !payload.name) {
+      throw new ApiError(401, 'Invalid Google ID token payload.', 'INVALID_CREDENTIALS');
+    }
+
+    return {
+      email: payload.email,
+      name: payload.name,
+      googleId: payload.sub,
+    };
+  } catch (err: any) {
+    if (err instanceof ApiError) throw err;
+    throw new ApiError(401, 'Google token verification failed.', 'INVALID_CREDENTIALS');
+  }
 };
 
 export default verifyGoogleCredential;

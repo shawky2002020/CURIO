@@ -1,36 +1,50 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router';
+import { onMounted, watch } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { useAuthStore } from '../../../stores/auth.store.js';
+import { useToastStore } from '../../../stores/toast.store.js';
 import AuthCard from '../components/AuthCard.vue';
 import LoginForm from '../components/LoginForm.vue';
 import GoogleLoginButton from '../components/GoogleLoginButton.vue';
-import { useAuthStore } from '../../../stores/auth.store.js';
 
-const authStore = useAuthStore();
 const router = useRouter();
+const route = useRoute();
+const authStore = useAuthStore();
+const toastStore = useToastStore();
 
-const handleSuccess = () => {
-  router.push({ name: 'profile' });
+// Redirect user if already authenticated
+const checkAuthAndRedirect = () => {
+  if (authStore.isAuthenticated) {
+    const redirect = route.query.redirect as string;
+    router.replace(redirect || '/');
+  }
 };
 
-const handleGoogleSignIn = async () => {
-  try {
-    // Trigger Google Sign-In logic
-    await authStore.login({ email: 'google_user@example.com', password: 'GooglePasswordMock123!' });
-    router.push({ name: 'profile' });
-  } catch (err) {
-    console.error('Google sign-in error', err);
-  }
+onMounted(() => {
+  authStore.error = null; // Clear previous authentication errors on page load
+  checkAuthAndRedirect();
+});
+
+// Watch for authentication state changes (e.g. after successful OAuth or login)
+watch(() => authStore.isAuthenticated, () => {
+  checkAuthAndRedirect();
+});
+
+const handleSuccess = () => {
+  toastStore.success('Welcome back to your Curio world.');
+  const redirect = route.query.redirect as string;
+  router.push(redirect || '/');
 };
 </script>
 
 <template>
   <div class="login-page-view">
-    <AuthCard>
+    <AuthCard class="motion-scale-in">
       <!-- Title & Branding -->
       <header class="auth-header">
-        <span class="auth-eyebrow">MEMBER PORTAL // SECURITY</span>
-        <h1 class="auth-title">Access the Curation</h1>
-        <p class="auth-subtitle">Establish secure handshake with your personal archive</p>
+        <span class="auth-eyebrow">WELCOME BACK, CURATOR</span>
+        <h1 class="auth-title">Step Into Your Curio World</h1>
+        <p class="auth-subtitle">Manage saved finds, secure details, and your curated shopping journey.</p>
       </header>
 
       <!-- Modular Login Form -->
@@ -38,21 +52,20 @@ const handleGoogleSignIn = async () => {
 
       <!-- Divider -->
       <div class="divider" aria-hidden="true">
-        <span class="divider-text">Verification Method B</span>
+        <span class="divider-text">Or sign in with</span>
       </div>
 
-      <!-- Social OAuth CTA -->
+      <!-- Social OAuth CTA (Official Google Button) -->
       <GoogleLoginButton
-        :loading="authStore.loading"
-        @click="handleGoogleSignIn"
+        @success="handleSuccess"
       />
 
       <!-- Navigation Linkages -->
       <footer class="auth-footer">
         <p class="footer-text">
-          Not registered in the archive? 
+          New to the curation circle? 
           <router-link to="/auth/register" class="auth-link">
-            Establish Registry
+            Create Account
           </router-link>
         </p>
       </footer>
@@ -73,27 +86,28 @@ const handleGoogleSignIn = async () => {
 }
 
 .auth-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.15em;
-  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--color-accent);
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .auth-title {
   font-family: var(--font-heading);
-  font-size: 2.2rem;
-  font-weight: 400;
-  color: var(--color-text-h);
-  margin: 0 0 8px 0;
-  line-height: 1.15;
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.02em;
 }
 
 .auth-subtitle {
   font-family: var(--font-sans);
-  font-size: 0.875rem;
-  color: var(--color-text);
+  font-size: 0.95rem;
+  color: var(--color-muted);
   margin: 0;
 }
 
@@ -109,7 +123,7 @@ const handleGoogleSignIn = async () => {
 .divider::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 2px solid var(--color-border);
 }
 
 .divider:not(:empty)::before {
@@ -121,49 +135,43 @@ const handleGoogleSignIn = async () => {
 }
 
 .divider-text {
-  font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
   color: var(--color-muted);
-  font-weight: 500;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.05em;
 }
 
 .auth-footer {
   margin-top: 32px;
-  border-top: 1px solid var(--color-border);
+  border-top: 2px solid var(--color-border);
   padding-top: 24px;
 }
 
 .footer-text {
   font-family: var(--font-sans);
-  font-size: 0.85rem;
-  color: var(--color-text);
+  font-size: 0.9rem;
+  color: var(--color-muted);
   margin: 0;
   text-align: left;
 }
 
 .auth-link {
-  color: var(--color-primary);
+  color: var(--color-accent);
   text-decoration: none;
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  transition: all 0.2s;
-  border-bottom: 1px solid transparent;
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 700;
+  transition: all var(--duration-fast) var(--ease-spring);
   display: inline-block;
   margin-left: 4px;
+  border-bottom: 2px solid transparent;
 }
 
 .auth-link:hover {
-  color: var(--color-text-h);
-  border-bottom-color: var(--color-text-h);
-}
-
-.auth-link:focus-visible {
-  outline: 1px solid var(--color-primary);
-  outline-offset: 2px;
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  transform: translateY(-1px);
 }
 </style>

@@ -47,11 +47,11 @@ const handleRequestReset = async () => {
 
 <template>
   <div class="forgot-password-view">
-    <AuthCard>
+    <AuthCard class="motion-scale-in">
       <header class="auth-header">
-        <span class="auth-eyebrow">MEMBER PORTAL // SECURITY</span>
-        <h1 class="auth-title">Recover Credentials</h1>
-        <p class="auth-subtitle">Provide your registered email to request security key reset</p>
+        <span class="auth-eyebrow">PORTAL SECURITY RECOVERY</span>
+        <h1 class="auth-title">Recover Key</h1>
+        <p class="auth-subtitle">Provide your email to receive secure recovery credentials</p>
       </header>
 
       <BaseAlert
@@ -81,7 +81,7 @@ const handleRequestReset = async () => {
           fullWidth
           class="submit-cta"
         >
-          Dispatch Recovery Key
+          Send Recovery Link
         </BaseButton>
       </form>
 
@@ -108,27 +108,28 @@ const handleRequestReset = async () => {
 }
 
 .auth-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
   letter-spacing: 0.15em;
-  color: var(--color-primary);
+  font-weight: 700;
+  color: var(--color-accent);
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .auth-title {
   font-family: var(--font-heading);
-  font-size: 2.2rem;
-  font-weight: 400;
-  color: var(--color-text-h);
-  margin: 0 0 8px 0;
-  line-height: 1.15;
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.02em;
 }
 
 .auth-subtitle {
   font-family: var(--font-sans);
-  font-size: 0.875rem;
-  color: var(--color-text);
+  font-size: 0.95rem;
+  color: var(--color-muted);
   margin: 0;
 }
 
@@ -148,30 +149,23 @@ const handleRequestReset = async () => {
 
 .auth-footer {
   margin-top: 32px;
-  border-top: 1px solid var(--color-border);
+  border-top: 2px solid var(--color-border);
   padding-top: 24px;
 }
 
 .back-link {
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-weight: 600;
-  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-muted);
   text-decoration: none;
-  transition: color 0.2s;
-  border-bottom: 1px solid transparent;
+  transition: all var(--duration-fast) var(--ease-spring);
+  border-bottom: 2px solid transparent;
   display: inline-block;
 }
 
 .back-link:hover {
   color: var(--color-primary);
   border-bottom-color: var(--color-primary);
-}
-
-.back-link:focus-visible {
-  outline: 1px solid var(--color-primary);
-  outline-offset: 2px;
 }
 </style>

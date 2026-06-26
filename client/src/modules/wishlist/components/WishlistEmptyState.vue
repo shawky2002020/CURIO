@@ -8,27 +8,23 @@ import BaseButton from '../../../components/ui/BaseButton.vue';
 </script>
 
 <template>
-  <div class="wishlist-empty">
-    <!-- Heart Icon Graphics -->
+  <div class="wishlist-empty motion-scale-in">
+    <!-- Heart Icon Graphics (Playful Bouncing Heart) -->
     <div class="empty-icon-wrapper" aria-hidden="true">
       <svg
-        class="empty-heart-icon"
+        class="empty-heart-icon bouncy-heart"
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="1.2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
+        fill="currentColor"
       >
-        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
       </svg>
     </div>
 
     <!-- Explanation Copy -->
     <h3 class="empty-title">Archive Vacant</h3>
     <p class="empty-description">
-      Your private collection archive is currently empty. Explore the active curation to save masterworks of interest.
+      Your curation archive is currently empty. Save objects you love here to easily track, acquire, or share them later.
     </p>
 
     <!-- Exploration CTA -->
@@ -49,22 +45,12 @@ import BaseButton from '../../../components/ui/BaseButton.vue';
   text-align: center;
   padding: 80px 40px;
   background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   max-width: 500px;
   margin: 0 auto;
   box-sizing: border-box;
-  position: relative;
-}
-
-.wishlist-empty::before {
-  content: '+';
-  position: absolute;
-  top: -9px;
-  left: -5px;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  color: var(--color-primary);
-  opacity: 0.6;
 }
 
 .empty-icon-wrapper {
@@ -73,31 +59,33 @@ import BaseButton from '../../../components/ui/BaseButton.vue';
   justify-content: center;
   width: 80px;
   height: 80px;
-  border: 1px solid var(--color-border);
-  color: var(--color-primary);
+  border-radius: 50%;
+  background-color: rgba(255, 107, 53, 0.08);
+  color: var(--color-accent);
   margin-bottom: 32px;
 }
 
 .empty-heart-icon {
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
 }
 
 .empty-title {
   font-family: var(--font-heading);
   font-size: 1.8rem;
-  font-weight: 400;
-  color: var(--color-text-h);
+  font-weight: 700;
+  color: var(--color-primary);
   margin: 0 0 12px 0;
+  letter-spacing: -0.01em;
 }
 
 .empty-description {
   font-family: var(--font-sans);
-  font-size: 0.9rem;
-  color: var(--color-text);
+  font-size: 0.95rem;
+  color: var(--color-muted);
   line-height: 1.6;
   margin: 0 0 32px 0;
-  max-width: 340px;
+  max-width: 360px;
 }
 
 .explore-link {

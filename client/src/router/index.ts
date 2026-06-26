@@ -17,7 +17,7 @@ const routes: RouteRecordRaw[] = [
       {
         path: '',
         name: 'home',
-        component: () => import('../modules/auth/pages/LoginPage.vue'), // Temporary fallback or Home page
+        component: () => import('../modules/catalog/pages/CatalogPage.vue'),
       },
       {
         path: 'profile',

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
+import { Eye, EyeOff } from '@lucide/vue';
 
 /**
  * BaseInput Component
@@ -85,9 +86,9 @@ const togglePasswordVisibility = () => {
         :aria-label="isPasswordVisible ? 'Hide password' : 'Show password'"
         tabindex="0"
       >
-        <!-- Custom CSS-only SVG representations for visibility icons -->
-        <span v-if="isPasswordVisible" class="eye-icon-off" aria-hidden="true"></span>
-        <span v-else class="eye-icon-on" aria-hidden="true"></span>
+        <!-- Lucide Icons for Password Visibility -->
+        <EyeOff v-if="isPasswordVisible" class="toggle-icon" aria-hidden="true" />
+        <Eye v-else class="toggle-icon" aria-hidden="true" />
       </button>
     </div>
 
@@ -204,45 +205,10 @@ const togglePasswordVisibility = () => {
   outline: 2px solid var(--color-accent);
 }
 
-/* Custom CSS Icons for Password Toggle Eye */
-.eye-icon-on::before {
-  content: "";
-  display: block;
-  width: 16px;
-  height: 10px;
-  border: 2px solid currentColor;
-  border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%;
-  position: relative;
-}
-
-.eye-icon-on::after {
-  content: "";
-  display: block;
-  width: 4px;
-  height: 4px;
-  background-color: currentColor;
-  border-radius: 50%;
-  position: absolute;
-}
-
-.eye-icon-off::before {
-  content: "";
-  display: block;
-  width: 16px;
-  height: 10px;
-  border: 2px solid currentColor;
-  border-radius: 50%;
-  position: relative;
-}
-
-.eye-icon-off::after {
-  content: "";
-  display: block;
+.toggle-icon {
   width: 18px;
-  height: 2px;
-  background-color: currentColor;
-  position: absolute;
-  transform: rotate(45deg);
+  height: 18px;
+  color: currentColor;
 }
 
 .input-hint {

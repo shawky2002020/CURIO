@@ -62,9 +62,9 @@ const handleRemoveItem = async (productId: string) => {
 <template>
   <div class="wishlist-view">
     <header class="page-header">
-      <span class="page-eyebrow">PORTAL // ARCHIVE COLLECTIONS</span>
-      <h1 class="page-title">Private Archive</h1>
-      <p class="page-subtitle">A curated index of your selected masterworks, precision instruments, and personal treasures.</p>
+      <span class="page-eyebrow">PORTAL WISHLIST ARCHIVE</span>
+      <h1 class="page-title">Your Curation</h1>
+      <p class="page-subtitle">Save items you love here to easily track, acquire, or share them later.</p>
     </header>
 
     <!-- 1. Loading State -->
@@ -74,11 +74,11 @@ const handleRemoveItem = async (productId: string) => {
     <BaseAlert v-else-if="wishlistStore.error" type="error" :message="wishlistStore.error" />
 
     <!-- 3. Success State -->
-    <div v-else class="wishlist-container">
+    <div v-else class="wishlist-container motion-scale-in">
       <!-- Empty State -->
       <WishlistEmptyState v-if="!wishlistStore.wishlist || wishlistStore.wishlist.items.length === 0" />
 
-      <!-- Active Wishlist Grid (Art Gallery Exhibition Grid) -->
+      <!-- Active Wishlist Grid -->
       <div v-else class="wishlist-grid-layout">
         <div
           v-for="item in wishlistStore.wishlist.items"
@@ -141,32 +141,33 @@ const handleRemoveItem = async (productId: string) => {
 .page-header {
   margin-bottom: 40px;
   text-align: left;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 2px solid var(--color-border);
   padding-bottom: 24px;
 }
 
 .page-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.15em;
-  color: var(--color-primary);
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--color-accent);
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .page-title {
   font-family: var(--font-heading);
   font-size: 2.5rem;
-  font-weight: 400;
-  color: var(--color-text-h);
+  font-weight: 700;
+  color: var(--color-primary);
   margin: 0 0 8px 0;
   letter-spacing: -0.02em;
 }
 
 .page-subtitle {
   font-family: var(--font-sans);
-  font-size: 0.95rem;
-  color: var(--color-text);
+  font-size: 1rem;
+  color: var(--color-muted);
   margin: 0;
 }
 
@@ -176,45 +177,32 @@ const handleRemoveItem = async (productId: string) => {
   gap: 32px;
 }
 
-/* Luxury Card (Art Gallery Exhibition Grid) */
+/* Playful Curation Card */
 .wishlist-item-card {
   display: flex;
   flex-direction: column;
   background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  position: relative;
-  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  transition: all var(--duration-base) var(--ease-spring);
   box-sizing: border-box;
 }
 
-.wishlist-item-card::before {
-  content: '+';
-  position: absolute;
-  top: -9px;
-  left: -5px;
-  font-family: var(--font-mono);
-  font-size: 14px;
-  color: var(--color-primary);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
 .wishlist-item-card:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-4px);
-}
-
-.wishlist-item-card:hover::before {
-  opacity: 0.8;
+  transform: translateY(-6px) scale(1.01);
+  border-color: var(--color-accent);
+  box-shadow: 0 20px 48px rgba(16, 16, 24, 0.08);
 }
 
 .product-image-wrapper {
   position: relative;
   width: 100%;
-  padding-top: 85%; /* Slightly taller than 4:3 for elegant scale */
-  background-color: var(--color-bg);
+  padding-top: 85%; /* Slightly taller aspect ratio */
+  background-color: var(--color-bg-alt);
   overflow: hidden;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 2px solid var(--color-border);
 }
 
 .product-image {
@@ -224,28 +212,26 @@ const handleRemoveItem = async (productId: string) => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: grayscale(15%);
-  transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition: all var(--duration-slow) var(--ease-spring);
 }
 
 .wishlist-item-card:hover .product-image {
   transform: scale(1.05);
-  filter: grayscale(0%);
 }
 
 .product-category-tag {
   position: absolute;
   top: 16px;
   left: 16px;
-  background-color: rgba(7, 8, 10, 0.85);
-  backdrop-filter: blur(4px);
-  color: var(--color-primary);
+  background-color: var(--color-surface);
+  color: var(--color-accent);
   font-family: var(--font-mono);
-  font-size: 0.65rem;
-  font-weight: 500;
-  letter-spacing: 0.1em;
-  padding: 4px 10px;
-  border: 1px solid rgba(197, 168, 128, 0.2);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 4px 12px;
+  border-radius: 99px;
+  border: 1px solid var(--color-border);
 }
 
 .product-details {
@@ -265,17 +251,18 @@ const handleRemoveItem = async (productId: string) => {
 
 .product-serial {
   font-family: var(--font-mono);
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   letter-spacing: 0.05em;
   color: var(--color-muted);
+  font-weight: 600;
 }
 
 .product-title {
   margin: 0;
   font-family: var(--font-heading);
-  font-size: 1.3rem;
-  font-weight: 400;
-  color: var(--color-text-h);
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--color-primary);
   line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -287,18 +274,18 @@ const handleRemoveItem = async (productId: string) => {
 .product-price {
   margin: 8px 0 0 0;
   font-family: var(--font-mono);
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: var(--color-primary);
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-accent);
 }
 
 .product-card-actions {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
-  gap: 16px;
+  gap: 12px;
   margin-top: auto;
   padding-top: 16px;
-  border-top: 1px solid var(--color-border);
+  border-top: 2px solid var(--color-bg-alt);
 }
 
 .btn-cart {
@@ -308,14 +295,15 @@ const handleRemoveItem = async (productId: string) => {
 .btn-remove {
   width: 100%;
   color: var(--color-muted) !important;
-  font-family: var(--font-mono);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  font-size: 0.75rem;
+  letter-spacing: 0.05em;
 }
 
 .btn-remove:hover {
-  color: var(--color-error) !important;
-  border-bottom-color: var(--color-error) !important;
+  color: var(--color-danger) !important;
+  background-color: rgba(229, 72, 77, 0.06) !important;
 }
 </style>

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-// Main Entry Point
+import BaseToastContainer from './components/ui/BaseToastContainer.vue';
 </script>
 
 <template>
   <router-view />
+  <BaseToastContainer />
 </template>
 
 <style>

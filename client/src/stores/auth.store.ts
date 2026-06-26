@@ -76,12 +76,30 @@ export const useAuthStore = defineStore('auth', () => {
     }
   };
 
+  const googleLogin = async (credentialToken: string) => {
+    loading.value = true;
+    error.value = null;
+    try {
+      const response = await authApi.googleLogin(credentialToken);
+      if (response.success && response.data) {
+        user.value = response.data.user;
+        tokenStorage.setAccessToken(response.data.accessToken);
+      }
+    } catch (err: any) {
+      error.value = err.response?.data?.message || 'Google login failed';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  };
+
   return {
     user,
     loading,
     error,
     isAuthenticated,
     login,
+    googleLogin,
     register,
     logout,
     initAuth,

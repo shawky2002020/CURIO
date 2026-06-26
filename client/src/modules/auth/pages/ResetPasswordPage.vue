@@ -88,11 +88,11 @@ const handleReset = async () => {
 
 <template>
   <div class="reset-password-view">
-    <AuthCard>
+    <AuthCard class="motion-scale-in">
       <header class="auth-header">
-        <span class="auth-eyebrow">MEMBER PORTAL // SECURITY</span>
-        <h1 class="auth-title">Establish New Key</h1>
-        <p class="auth-subtitle">Configure your new cryptographic security credentials</p>
+        <span class="auth-eyebrow">PORTAL SECURITY RECOVERY</span>
+        <h1 class="auth-title">Reset Password</h1>
+        <p class="auth-subtitle">Configure a new secure credentials key for your account</p>
       </header>
 
       <BaseAlert v-if="globalError" type="error" :message="globalError" class="reset-alert" />
@@ -135,7 +135,7 @@ const handleReset = async () => {
           fullWidth
           class="submit-cta"
         >
-          Update Security Credentials
+          Update Credentials
         </BaseButton>
       </form>
     </AuthCard>
@@ -155,27 +155,28 @@ const handleReset = async () => {
 }
 
 .auth-eyebrow {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
   letter-spacing: 0.15em;
-  color: var(--color-primary);
+  font-weight: 700;
+  color: var(--color-accent);
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .auth-title {
   font-family: var(--font-heading);
-  font-size: 2.2rem;
-  font-weight: 400;
-  color: var(--color-text-h);
-  margin: 0 0 8px 0;
-  line-height: 1.15;
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.02em;
 }
 
 .auth-subtitle {
   font-family: var(--font-sans);
-  font-size: 0.875rem;
-  color: var(--color-text);
+  font-size: 0.95rem;
+  color: var(--color-muted);
   margin: 0;
 }
 

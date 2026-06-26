@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { Info, CheckCircle, AlertTriangle, XCircle, X } from '@lucide/vue';
 
 /**
  * BaseAlert Component
@@ -12,7 +13,7 @@ interface Props {
   closable?: boolean;
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   type: 'info',
   title: '',
   closable: false,
@@ -23,6 +24,21 @@ const isVisible = ref(true);
 const handleClose = () => {
   isVisible.value = false;
 };
+
+// Compute dynamic icon component based on alert type
+const alertIcon = computed(() => {
+  switch (props.type) {
+    case 'success':
+      return CheckCircle;
+    case 'warning':
+      return AlertTriangle;
+    case 'error':
+      return XCircle;
+    case 'info':
+    default:
+      return Info;
+  }
+});
 </script>
 
 <template>
@@ -33,9 +49,9 @@ const handleClose = () => {
     aria-live="polite"
   >
     <div class="alert-body">
-      <!-- Custom CSS Indicators for Icons -->
+      <!-- Icon Indicator -->
       <div class="alert-icon-container" aria-hidden="true">
-        <span :class="['alert-icon', `icon-${type}`]"></span>
+        <component :is="alertIcon" class="alert-icon-svg" />
       </div>
 
       <div class="alert-text">
@@ -52,7 +68,7 @@ const handleClose = () => {
       @click="handleClose"
       aria-label="Dismiss alert"
     >
-      <span class="close-cross" aria-hidden="true">&times;</span>
+      <X class="close-icon" aria-hidden="true" />
     </button>
   </div>
 </template>
@@ -83,70 +99,10 @@ const handleClose = () => {
   margin-top: 2px;
 }
 
-/* CSS-only clean icons for various alert levels */
-.alert-icon {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: inline-block;
-  position: relative;
-}
-
-.icon-info {
-  background-color: var(--color-info);
-}
-.icon-info::before {
-  content: "i";
-  color: white;
-  font-weight: bold;
-  font-family: var(--font-sans);
-  font-size: 11px;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.icon-success {
-  background-color: var(--color-success);
-}
-.icon-success::before {
-  content: "✓";
-  color: white;
-  font-weight: bold;
-  font-size: 11px;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.icon-warning {
-  background-color: var(--color-warning);
-}
-.icon-warning::before {
-  content: "!";
-  color: white;
-  font-weight: bold;
-  font-size: 11px;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.icon-error {
-  background-color: var(--color-error);
-}
-.icon-error::before {
-  content: "✕";
-  color: white;
-  font-weight: bold;
-  font-size: 9px;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+.alert-icon-svg {
+  width: 20px;
+  height: 20px;
+  color: currentColor;
 }
 
 .alert-text {
@@ -239,8 +195,8 @@ const handleClose = () => {
   outline: 2px solid currentColor;
 }
 
-.close-cross {
-  font-size: 1.25rem;
-  line-height: 1;
+.close-icon {
+  width: 16px;
+  height: 16px;
 }
 </style>

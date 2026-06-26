@@ -2,6 +2,7 @@
 import { computed } from 'vue';
 import { useWishlistStore } from '../../../stores/wishlist.store.js';
 import { useAuthStore } from '../../../stores/auth.store.js';
+import { useToastStore } from '../../../stores/toast.store.js';
 import { useRouter } from 'vue-router';
 
 /**
@@ -14,6 +15,7 @@ const props = defineProps<{
 
 const wishlistStore = useWishlistStore();
 const authStore = useAuthStore();
+const toastStore = useToastStore();
 const router = useRouter();
 
 // Compute whether the item is in the wishlist
@@ -27,18 +29,22 @@ const handleToggle = async (event: Event) => {
   event.preventDefault();
 
   if (!authStore.isAuthenticated) {
+    toastStore.info('Please sign in to save items.');
     // Redirect to login page if unauthenticated
-    router.push({ name: 'login' });
+    router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } });
     return;
   }
 
   try {
     if (isWishlisted.value) {
       await wishlistStore.removeFromWishlist(props.productId);
+      toastStore.success('Item released from your curation.');
     } else {
       await wishlistStore.addToWishlist(props.productId);
+      toastStore.success('Item archived in your curation.');
     }
   } catch (err) {
+    toastStore.error('Failed to update curation.');
     console.error('Failed to toggle wishlist state', err);
   }
 };

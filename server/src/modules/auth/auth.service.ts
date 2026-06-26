@@ -8,6 +8,7 @@ import { sanitizeUser } from '../../utils/sanitizeUser.js';
 import { tokenService } from '../tokens/token.service.js';
 import { sendEmail } from '../../services/email.service.js';
 import { generateOtp, sendOtpSms } from '../../services/otp.service.js';
+import { verifyGoogleCredential } from '../../services/googleOAuth.service.js';
 import { env } from '../../config/env.js';
 import { TOKEN_EXPIRATIONS } from './auth.constants.js';
 
@@ -125,6 +126,55 @@ export class AuthService {
     const refreshToken = generateRefreshToken(user._id.toString());
 
     // Securely hash and store refresh token
+    await tokenService.createToken(user._id.toString(), 'refresh', 7 * 24 * 60 * 60 * 1000, refreshToken);
+
+    return {
+      user: sanitizeUser(user),
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  /**
+   * Google OAuth Login/Register service.
+   */
+  public async googleLogin(credentialToken: string): Promise<AuthResponse> {
+    const googleUser = await verifyGoogleCredential(credentialToken);
+    
+    let user = await User.findOne({ email: googleUser.email });
+
+    if (user) {
+      // Link Google ID if not already linked
+      if (!user.googleId) {
+        user.googleId = googleUser.googleId;
+      }
+      user.lastLoginAt = new Date();
+      await user.save();
+    } else {
+      // Register new Google user
+      user = await User.create({
+        fullName: googleUser.name,
+        email: googleUser.email,
+        googleId: googleUser.googleId,
+        provider: 'google',
+        role: 'customer',
+        status: 'active',
+        emailVerified: true,
+        phoneVerified: false,
+      });
+    }
+
+    if (user.status === 'blocked') {
+      throw new ApiError(403, 'Your account has been blocked.', 'USER_BLOCKED');
+    }
+
+    if (user.status === 'deleted') {
+      throw new ApiError(403, 'Your account has been deleted.', 'USER_DELETED');
+    }
+
+    const accessToken = generateAccessToken(user._id.toString(), user.role);
+    const refreshToken = generateRefreshToken(user._id.toString());
+
     await tokenService.createToken(user._id.toString(), 'refresh', 7 * 24 * 60 * 60 * 1000, refreshToken);
 
     return {
