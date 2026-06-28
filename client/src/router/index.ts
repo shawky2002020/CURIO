@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import type { RouteRecordRaw } from 'vue-router';
-import { authGuard } from './guards.js';
+import { authGuard, roleGuard } from './guards.js';
 
 // Layouts
 import MainLayout from '../layouts/MainLayout.vue';
@@ -20,6 +20,11 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../modules/catalog/pages/CatalogPage.vue'),
       },
       {
+        path: 'products/:id',
+        name: 'product-detail',
+        component: () => import('../modules/catalog/pages/ProductDetailPage.vue'),
+      },
+      {
         path: 'profile',
         name: 'profile',
         component: () => import('../modules/profile/pages/ProfilePage.vue'),
@@ -36,6 +41,18 @@ const routes: RouteRecordRaw[] = [
         name: 'wishlist',
         component: () => import('../modules/wishlist/pages/WishlistPage.vue'),
         beforeEnter: authGuard,
+      },
+      {
+        path: 'admin/products',
+        name: 'admin-products',
+        component: () => import('../modules/admin/pages/AdminProductsPage.vue'),
+        beforeEnter: roleGuard(['admin', 'seller']),
+      },
+      {
+        path: 'admin/categories',
+        name: 'admin-categories',
+        component: () => import('../modules/admin/pages/AdminCategoriesPage.vue'),
+        beforeEnter: roleGuard(['admin']),
       },
       {
         path: 'forbidden',
@@ -59,3 +76,4 @@ export const router = createRouter({
 });
 
 export default router;
+

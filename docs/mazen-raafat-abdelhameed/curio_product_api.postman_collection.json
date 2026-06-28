@@ -1,0 +1,298 @@
+{
+  "info": {
+    "_postman_id": "d9417a13-3974-4462-a4e1-99dc7b1185dc",
+    "name": "CURIO Product Management API",
+    "description": "API collection for the Product Management module: Categories, Products (with search/filter), and Reviews.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"]
+            },
+            "description": "Returns all product categories sorted by name."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Category by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", ":id"],
+              "variable": [{ "key": "id", "value": "{{categoryId}}" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Category (Admin)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Leather Goods\",\n  \"description\": \"Handcrafted premium leather accessories\",\n  \"imageUrl\": \"https://images.unsplash.com/photo-1547949003-9792a18a2601\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"]
+            },
+            "description": "Creates a new product category. Admin role required."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Category (Admin)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Fine Leather Goods\",\n  \"description\": \"Updated description\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/categories/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", ":id"],
+              "variable": [{ "key": "id", "value": "{{categoryId}}" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Category (Admin)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", ":id"],
+              "variable": [{ "key": "id", "value": "{{categoryId}}" }]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Get All Products (Public, with filters)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products?search=&categoryId=&minPrice=&maxPrice=",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"],
+              "query": [
+                { "key": "search", "value": "", "description": "Full-text search on name and description" },
+                { "key": "categoryId", "value": "", "description": "Filter by category ObjectId" },
+                { "key": "minPrice", "value": "", "description": "Minimum price filter" },
+                { "key": "maxPrice", "value": "", "description": "Maximum price filter" }
+              ]
+            },
+            "description": "Returns all active products. Supports search and filtering."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Product by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":id"],
+              "variable": [{ "key": "id", "value": "{{productId}}" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Product (Admin / Seller)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.success && r.data) { pm.environment.set('productId', r.data._id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Signature Chronograph Watch\",\n  \"description\": \"Precision engineered dial with hand-stitched leather strap.\",\n  \"price\": 249.00,\n  \"stock\": 12,\n  \"categoryId\": \"{{categoryId}}\",\n  \"images\": [\n    \"https://images.unsplash.com/photo-1523275335684-37898b6baf30\"\n  ],\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products",
+              "host": ["{{baseUrl}}"],
+              "path": ["products"]
+            },
+            "description": "Creates a new product. Requires Admin or Seller role."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Product (Admin / Seller)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 229.00,\n  \"stock\": 8,\n  \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":id"],
+              "variable": [{ "key": "id", "value": "{{productId}}" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Product (Admin / Seller)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:id",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":id"],
+              "variable": [{ "key": "id", "value": "{{productId}}" }]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "item": [
+        {
+          "name": "Get Product Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:productId/reviews",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":productId", "reviews"],
+              "variable": [{ "key": "productId", "value": "{{productId}}" }]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Review (Customer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const r = pm.response.json();",
+                  "if (r.success && r.data) { pm.environment.set('reviewId', r.data._id); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"An absolutely stunning piece. The leather strap is supple and the dial is beautifully finished.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/:productId/reviews",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":productId", "reviews"],
+              "variable": [{ "key": "productId", "value": "{{productId}}" }]
+            },
+            "description": "Submits a review. One review per customer per product. Rating must be 1–5."
+          },
+          "response": []
+        },
+        {
+          "name": "Update Review",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json", "type": "text" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 4,\n  \"comment\": \"Updated comment after extended use.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/:productId/reviews/:reviewId",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":productId", "reviews", ":reviewId"],
+              "variable": [
+                { "key": "productId", "value": "{{productId}}" },
+                { "key": "reviewId", "value": "{{reviewId}}" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Review",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/products/:productId/reviews/:reviewId",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", ":productId", "reviews", ":reviewId"],
+              "variable": [
+                { "key": "productId", "value": "{{productId}}" },
+                { "key": "reviewId", "value": "{{reviewId}}" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api", "type": "string" },
+    { "key": "accessToken", "value": "your_jwt_token_here", "type": "string" },
+    { "key": "categoryId", "value": "", "type": "string" },
+    { "key": "productId", "value": "", "type": "string" },
+    { "key": "reviewId", "value": "", "type": "string" }
+  ]
+}

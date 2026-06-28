@@ -21,7 +21,10 @@ const router = useRouter();
 // Compute whether the item is in the wishlist
 const isWishlisted = computed(() => {
   if (!wishlistStore.wishlist) return false;
-  return wishlistStore.wishlist.items.some((item: any) => item.productId === props.productId);
+  return wishlistStore.wishlist.items.some((item: any) => {
+    const id = typeof item.productId === 'object' ? item.productId._id : item.productId;
+    return id === props.productId;
+  });
 });
 
 const handleToggle = async (event: Event) => {

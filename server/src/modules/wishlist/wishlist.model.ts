@@ -24,6 +24,7 @@ const wishlistSchema = new Schema<IWishlist>(
       {
         productId: {
           type: Schema.Types.ObjectId,
+          ref: 'Product',
           required: true,
         },
         addedAt: {

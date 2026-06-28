@@ -6,6 +6,8 @@ import { errorMiddleware } from './middlewares/error.middleware.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import userRoutes from './modules/users/user.routes.js';
 import wishlistRoutes from './modules/wishlist/wishlist.routes.js';
+import productRoutes from './modules/products/product.routes.js';
+import categoryRoutes from './modules/products/category.routes.js';
 
 const app = express();
 
@@ -19,6 +21,8 @@ app.use(cookieParser());
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/categories', categoryRoutes);
 
 // Health Check
 app.get('/health', (req, res) => {

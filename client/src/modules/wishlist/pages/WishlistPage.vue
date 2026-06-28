@@ -1,51 +1,91 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { onMounted, ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useWishlistStore } from '../../../stores/wishlist.store.js';
+import { useCategoryStore } from '../../../stores/category.store.js';
 import WishlistEmptyState from '../components/WishlistEmptyState.vue';
 import BaseLoader from '../../../components/ui/BaseLoader.vue';
 import BaseAlert from '../../../components/ui/BaseAlert.vue';
 import BaseButton from '../../../components/ui/BaseButton.vue';
+import { Search, X } from '@lucide/vue';
 
 const wishlistStore = useWishlistStore();
+const categoryStore = useCategoryStore();
+const router = useRouter();
 const removingId = ref<string | null>(null);
 
-// Load wishlist on mount
+// Filter state
+const searchQuery = ref('');
+const activeCategoryId = ref('');
+
+// Load wishlist + categories on mount
 onMounted(async () => {
   try {
-    await wishlistStore.fetchWishlist();
+    await Promise.all([
+      wishlistStore.fetchWishlist(),
+      categoryStore.fetchCategories(),
+    ]);
   } catch (err) {
-    console.error('Failed to fetch user wishlist details', err);
+    console.error('Failed to fetch wishlist or categories', err);
   }
 });
 
-// Mock resolver mapping stored productIds to rich product details (mocking Product Catalog Member 2 integration)
-const resolveProductDetails = (productId: string) => {
-  const catalog: Record<string, { name: string; price: number; image: string; category: string }> = {
-    '60d5ecb863a6c22c5c8b4999': {
-      name: 'Signature Chronograph Leather Watch',
-      price: 249.00,
-      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=300&q=80',
-      category: 'Chronometry',
-    },
-    '60d5ecb863a6c22c5c8b4998': {
-      name: 'Premium Leather Overnight Duffle',
-      price: 189.00,
-      image: 'https://images.unsplash.com/photo-1547949003-9792a18a2601?auto=format&fit=crop&w=300&q=80',
-      category: 'Leather Goods',
-    },
-    'default': {
-      name: `Premium Curation Item (${productId.substring(0, 8)})`,
-      price: 99.99,
-      image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=300&q=80',
-      category: 'Exhibition',
-    }
-  };
+// Filtered wishlist items
+const filteredItems = computed(() => {
+  if (!wishlistStore.wishlist) return [];
+  let items = wishlistStore.wishlist.items;
 
-  return catalog[productId] || {
-    ...catalog['default'],
-    name: `Premium Curation Item (${productId.substring(0, 8)})`
-  };
+  // Filter by search query (name or description)
+  if (searchQuery.value.trim()) {
+    const q = searchQuery.value.toLowerCase();
+    items = items.filter((item) => {
+      const product = item.productId;
+      if (!product || typeof product !== 'object') return false;
+      return (
+        product.name?.toLowerCase().includes(q) ||
+        product.description?.toLowerCase().includes(q)
+      );
+    });
+  }
+
+  // Filter by category
+  if (activeCategoryId.value) {
+    items = items.filter((item) => {
+      const product = item.productId;
+      if (!product || typeof product !== 'object') return false;
+      const catId = typeof product.categoryId === 'object' ? product.categoryId._id : product.categoryId;
+      return catId === activeCategoryId.value;
+    });
+  }
+
+  return items;
+});
+
+// Get unique categories from wishlisted products
+const wishlistCategories = computed(() => {
+  if (!wishlistStore.wishlist) return [];
+  const catMap = new Map<string, string>();
+  for (const item of wishlistStore.wishlist.items) {
+    const product = item.productId;
+    if (!product || typeof product !== 'object') continue;
+    const cat = product.categoryId as any;
+    if (cat && typeof cat === 'object' && cat._id && cat.name) {
+      catMap.set(cat._id, cat.name);
+    }
+  }
+  return Array.from(catMap.entries()).map(([id, name]) => ({ _id: id, name }));
+});
+
+const setCategory = (id: string) => {
+  activeCategoryId.value = activeCategoryId.value === id ? '' : id;
 };
+
+const clearFilters = () => {
+  searchQuery.value = '';
+  activeCategoryId.value = '';
+};
+
+const hasActiveFilters = computed(() => !!searchQuery.value.trim() || !!activeCategoryId.value);
 
 const handleRemoveItem = async (productId: string) => {
   removingId.value = productId;
@@ -56,6 +96,10 @@ const handleRemoveItem = async (productId: string) => {
   } finally {
     removingId.value = null;
   }
+};
+
+const navigateToProduct = (productId: string) => {
+  router.push({ name: 'product-detail', params: { id: productId } });
 };
 </script>
 
@@ -78,57 +122,106 @@ const handleRemoveItem = async (productId: string) => {
       <!-- Empty State -->
       <WishlistEmptyState v-if="!wishlistStore.wishlist || wishlistStore.wishlist.items.length === 0" />
 
-      <!-- Active Wishlist Grid -->
-      <div v-else class="wishlist-grid-layout">
-        <div
-          v-for="item in wishlistStore.wishlist.items"
-          :key="item.productId"
-          class="wishlist-item-card"
-        >
-          <!-- Product image block -->
-          <div class="product-image-wrapper">
-            <img
-              :src="resolveProductDetails(item.productId).image"
-              :alt="resolveProductDetails(item.productId).name"
-              class="product-image"
-              loading="lazy"
+      <!-- Active Wishlist -->
+      <template v-else>
+        <!-- Filter Bar -->
+        <section class="wishlist-filters" aria-label="Wishlist Filters">
+          <div class="search-box">
+            <Search class="search-icon" aria-hidden="true" />
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search your curated items..."
+              class="search-input"
+              aria-label="Search wishlist"
             />
-            <span class="product-category-tag">
-              [ {{ resolveProductDetails(item.productId).category }} ]
-            </span>
+            <button v-if="searchQuery" class="clear-search-btn" @click="searchQuery = ''" aria-label="Clear search">
+              <X :size="16" />
+            </button>
           </div>
 
-          <!-- Product Details Block -->
-          <div class="product-details">
-            <div class="meta-row">
-              <span class="product-serial">CATALOG REF // {{ item.productId.substring(0, 10).toUpperCase() }}</span>
-              <h3 class="product-title">
-                {{ resolveProductDetails(item.productId).name }}
-              </h3>
-              <p class="product-price">
-                ${{ resolveProductDetails(item.productId).price.toFixed(2) }}
-              </p>
+          <nav v-if="wishlistCategories.length > 1" class="category-tabs" aria-label="Filter by category">
+            <button
+              :class="['category-tab', { 'category-tab--active': activeCategoryId === '' }]"
+              @click="setCategory('')"
+            >
+              All
+            </button>
+            <button
+              v-for="cat in wishlistCategories"
+              :key="cat._id"
+              :class="['category-tab', { 'category-tab--active': activeCategoryId === cat._id }]"
+              @click="setCategory(cat._id)"
+            >
+              {{ cat.name }}
+            </button>
+          </nav>
+        </section>
+
+        <!-- Filtered Empty State -->
+        <div v-if="filteredItems.length === 0 && hasActiveFilters" class="filter-empty motion-scale-in">
+          <h3 class="filter-empty-title">No items match your filter</h3>
+          <p class="filter-empty-desc">Try adjusting your search or category selection.</p>
+          <BaseButton variant="secondary" size="sm" @click="clearFilters">Reset Filters</BaseButton>
+        </div>
+
+        <!-- Wishlist Grid -->
+        <div v-else class="wishlist-grid-layout">
+          <div
+            v-for="item in filteredItems"
+            :key="item.productId._id"
+            class="wishlist-item-card"
+            @click="navigateToProduct(item.productId._id)"
+            role="button"
+            tabindex="0"
+          >
+            <!-- Product image block -->
+            <div class="product-image-wrapper">
+              <img
+                :src="item.productId.images?.[0] || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=300&q=80'"
+                :alt="item.productId.name"
+                class="product-image"
+                loading="lazy"
+              />
+              <span class="product-category-tag">
+                [ {{ typeof item.productId.categoryId === 'object' ? item.productId.categoryId.name : 'Uncategorized' }} ]
+              </span>
+              <span v-if="item.productId.stock === 0" class="out-of-stock-badge">Out of Stock</span>
             </div>
-            
-            <!-- Actions (Add to Cart placeholder, and Remove CTA) -->
-            <div class="product-card-actions">
-              <BaseButton variant="primary" size="sm" class="btn-cart">
-                Acquire
-              </BaseButton>
+
+            <!-- Product Details Block -->
+            <div class="product-details">
+              <div class="meta-row">
+                <span class="product-serial">CATALOG REF // {{ item.productId._id.substring(0, 10).toUpperCase() }}</span>
+                <h3 class="product-title">
+                  {{ item.productId.name }}
+                </h3>
+                <p class="product-description">{{ item.productId.description }}</p>
+                <p class="product-price">
+                  ${{ item.productId.price?.toFixed(2) }}
+                </p>
+              </div>
               
-              <BaseButton
-                variant="ghost"
-                size="sm"
-                :loading="removingId === item.productId"
-                @click="handleRemoveItem(item.productId)"
-                class="btn-remove"
-              >
-                Release
-              </BaseButton>
+              <!-- Actions -->
+              <div class="product-card-actions" @click.stop>
+                <BaseButton variant="primary" size="sm" class="btn-cart" @click="navigateToProduct(item.productId._id)">
+                  View Details
+                </BaseButton>
+                
+                <BaseButton
+                  variant="ghost"
+                  size="sm"
+                  :loading="removingId === item.productId._id"
+                  @click="handleRemoveItem(item.productId._id)"
+                  class="btn-remove"
+                >
+                  Release
+                </BaseButton>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </template>
     </div>
   </div>
 </template>
@@ -171,13 +264,134 @@ const handleRemoveItem = async (productId: string) => {
   margin: 0;
 }
 
+/* Filter Bar */
+.wishlist-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 36px;
+}
+
+.search-box {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  width: 18px;
+  height: 18px;
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 40px 12px 48px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  transition: all var(--duration-base) var(--ease-out);
+  box-sizing: border-box;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(15, 61, 94, 0.08);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.clear-search-btn:hover {
+  color: var(--color-primary);
+}
+
+.category-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.category-tab {
+  background-color: var(--color-bg-alt);
+  color: var(--color-primary);
+  border: 1px solid var(--color-border);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 16px;
+  border-radius: 9999px;
+  cursor: pointer;
+  transition: all var(--duration-base) var(--ease-spring);
+}
+
+.category-tab:hover {
+  color: var(--color-accent);
+  background-color: var(--color-surface);
+}
+
+.category-tab--active {
+  background-color: var(--color-primary) !important;
+  color: var(--color-surface) !important;
+  border-color: var(--color-primary) !important;
+}
+
+/* Filter Empty */
+.filter-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 60px 40px;
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.filter-empty-title {
+  font-family: var(--font-heading);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0 0 8px 0;
+}
+
+.filter-empty-desc {
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  color: var(--color-muted);
+  margin: 0 0 20px 0;
+}
+
+/* Grid */
 .wishlist-grid-layout {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
   gap: 32px;
 }
 
-/* Playful Curation Card */
+/* Curation Card */
 .wishlist-item-card {
   display: flex;
   flex-direction: column;
@@ -188,6 +402,7 @@ const handleRemoveItem = async (productId: string) => {
   box-shadow: var(--shadow-card);
   transition: all var(--duration-base) var(--ease-spring);
   box-sizing: border-box;
+  cursor: pointer;
 }
 
 .wishlist-item-card:hover {
@@ -199,7 +414,7 @@ const handleRemoveItem = async (productId: string) => {
 .product-image-wrapper {
   position: relative;
   width: 100%;
-  padding-top: 85%; /* Slightly taller aspect ratio */
+  padding-top: 85%;
   background-color: var(--color-bg-alt);
   overflow: hidden;
   border-bottom: 2px solid var(--color-border);
@@ -234,6 +449,21 @@ const handleRemoveItem = async (productId: string) => {
   border: 1px solid var(--color-border);
 }
 
+.out-of-stock-badge {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background-color: var(--color-danger);
+  color: white;
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 4px 12px;
+  border-radius: 99px;
+  text-transform: uppercase;
+}
+
 .product-details {
   display: flex;
   flex-direction: column;
@@ -266,9 +496,23 @@ const handleRemoveItem = async (productId: string) => {
   line-height: 1.25;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   height: 2.5em;
+}
+
+.product-description {
+  margin: 4px 0 0 0;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .product-price {

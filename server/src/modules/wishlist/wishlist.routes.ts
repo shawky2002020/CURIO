@@ -7,8 +7,7 @@ import { wishlistParamsSchema } from './wishlist.validation.js';
 
 const router = Router();
 
-// Protect all wishlist routes for authenticated Customers only
-router.use(auth, role('customer'));
+router.use(auth);
 
 router.get('/', wishlistController.getWishlist);
 router.post('/:productId', validate(wishlistParamsSchema), wishlistController.addToWishlist);

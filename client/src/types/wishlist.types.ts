@@ -1,5 +1,7 @@
+import type { Product } from './product.types.js';
+
 export interface WishlistItem {
-  productId: string;
+  productId: Product;
   addedAt: string;
 }
 

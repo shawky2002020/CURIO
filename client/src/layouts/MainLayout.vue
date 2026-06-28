@@ -69,6 +69,10 @@ const navItems = computed<NavItem[]>(() => {
       { label: 'Curation', to: '/wishlist', matchNames: ['wishlist'] },
       { label: 'Member Hub', to: '/profile', matchNames: ['profile', 'profile-edit'] }
     );
+
+    if (authStore.user?.role === 'admin' || authStore.user?.role === 'seller') {
+      items.push({ label: 'Studio', to: '/admin/products', matchNames: ['admin-products', 'admin-categories'] });
+    }
   }
   
   return items;
