@@ -1,28 +1,56 @@
 <script setup lang="ts">
+/**
+ * AdminCategoriesPage
+ * Administrative Category Management dashboard supporting Create, Read, Update, Delete,
+ * and Restoration, composed using BaseTable, BaseModal, and BaseConfirmDialog.
+ */
 import { ref, onMounted, computed } from 'vue';
 import { useCategoryStore } from '../../../stores/category.store.js';
 import { useToastStore } from '../../../stores/toast.store.js';
-import type { CreateCategoryPayload } from '../../../types/product.types.js';
-import BaseButton from '../../../components/ui/BaseButton.vue';
-import { Plus, Pencil, Trash2, Tag } from '@lucide/vue';
 import { useAuthStore } from '../../../stores/auth.store.js';
 import { useRouter } from 'vue-router';
+import type { CreateCategoryPayload } from '../../../types/product.types.js';
+import { Plus, Pencil, Trash2, Tag, RotateCcw } from '@lucide/vue';
+import BaseButton from '../../../components/ui/BaseButton.vue';
+
+// UI Base Components
+import BaseTable from '../../../components/ui/BaseTable.vue';
+import BaseModal from '../../../components/ui/BaseModal.vue';
+import BaseConfirmDialog from '../../../components/ui/BaseConfirmDialog.vue';
+
 const categoryStore = useCategoryStore();
 const toastStore = useToastStore();
+const authStore = useAuthStore();
+const router = useRouter();
 
-// Modal state
+// Table configuration headers
+const tableHeaders = [
+  { key: 'imageUrl', label: 'Image', width: '80px' },
+  { key: 'name', label: 'Name' },
+  { key: 'slug', label: 'Slug' },
+  { key: 'description', label: 'Description' },
+  { key: 'status', label: 'Status' },
+  { key: 'actions', label: 'Actions', align: 'right' as const },
+];
+
+// Modal / Dialog States
 const showModal = ref(false);
 const editingId = ref<string | null>(null);
 const form = ref<CreateCategoryPayload>({ name: '', description: '', imageUrl: '' });
 const saving = ref(false);
-const authStore = useAuthStore();
-const router = useRouter();
 
+const showConfirmDialog = ref(false);
+const confirmDialogTitle = ref('');
+const confirmDialogMessage = ref('');
+const confirmDialogVariant = ref<'primary' | 'danger' | 'warning'>('primary');
+const confirmDialogLoading = ref(false);
+const onConfirmCallback = ref<(() => Promise<void>) | null>(null);
 
-const modalTitle = computed(() => (editingId.value ? 'New Category' : 'New Category'));
+const modalTitle = computed(() => (editingId.value ? 'Edit Category' : 'New Category'));
 
 onMounted(async () => {
-  await categoryStore.fetchCategories();
+  // Fetch all categories including soft-deleted ones for administration
+  await categoryStore.fetchCategories(true);
 });
 
 const openCreate = () => {
@@ -54,6 +82,8 @@ const handleSave = async () => {
       toastStore.success('Category created successfully.');
     }
     closeModal();
+    // Refresh to ensure status and other properties show up correctly
+    await categoryStore.fetchCategories(true);
   } catch (err: any) {
     toastStore.error(err.response?.data?.message || 'Failed to save category.');
   } finally {
@@ -61,33 +91,76 @@ const handleSave = async () => {
   }
 };
 
-const showDeleteConfirm = ref(false);
-const catToDelete = ref<any | null>(null);
-
-const openDeleteConfirm = (cat: any) => {
-  catToDelete.value = cat;
-  showDeleteConfirm.value = true;
+// Confirmation Overlay Orchestrator
+const openConfirm = (
+  title: string,
+  message: string,
+  variant: 'primary' | 'danger' | 'warning',
+  onConfirm: () => Promise<void>
+) => {
+  confirmDialogTitle.value = title;
+  confirmDialogMessage.value = message;
+  confirmDialogVariant.value = variant;
+  onConfirmCallback.value = onConfirm;
+  showConfirmDialog.value = true;
 };
 
-const closeDeleteConfirm = () => {
-  catToDelete.value = null;
-  showDeleteConfirm.value = false;
-};
-
-const executeDelete = async () => {
-  if (!catToDelete.value) return;
-  try {
-    await categoryStore.deleteCategory(catToDelete.value._id);
-    toastStore.success('Category deleted successfully.');
-    closeDeleteConfirm();
-  } catch (err: any) {
-    toastStore.error(err.response?.data?.message || 'Failed to delete category.');
+const handleConfirmDialogAction = async () => {
+  if (onConfirmCallback.value) {
+    confirmDialogLoading.value = true;
+    try {
+      await onConfirmCallback.value();
+      showConfirmDialog.value = false;
+    } catch (err) {
+      // Errors handled inside callback
+    } finally {
+      confirmDialogLoading.value = false;
+      onConfirmCallback.value = null;
+    }
   }
+};
+
+const handleConfirmDialogCancel = () => {
+  onConfirmCallback.value = null;
+};
+
+const handleDeleteCategory = (cat: any) => {
+  openConfirm(
+    'Delete Category',
+    `Are you sure you want to soft delete the category "${cat.name}"? Active products in this category may become uncategorized.`,
+    'danger',
+    async () => {
+      try {
+        await categoryStore.deleteCategory(cat._id);
+        toastStore.success('Category deleted successfully.');
+      } catch (err: any) {
+        toastStore.error(err.response?.data?.message || 'Failed to delete category.');
+        throw err;
+      }
+    }
+  );
+};
+
+const handleRestoreCategory = (cat: any) => {
+  openConfirm(
+    'Restore Category',
+    `Are you sure you want to restore the category "${cat.name}"? This will make it active and visible to buyers again.`,
+    'primary',
+    async () => {
+      try {
+        await categoryStore.restoreCategory(cat._id);
+        toastStore.success('Category restored successfully.');
+      } catch (err: any) {
+        toastStore.error(err.response?.data?.message || 'Failed to restore category.');
+        throw err;
+      }
+    }
+  );
 };
 </script>
 
 <template>
-  <div class="admin-view">
+  <div class="admin-categories-page">
     <!-- Header -->
     <header class="page-header">
       <div class="header-row">
@@ -97,8 +170,12 @@ const executeDelete = async () => {
         </div>
 
         <div class="header-actions">
-          <BaseButton v-if="authStore.user?.role === 'admin'" variant="secondary"
-            @click="router.push({ name: 'admin-products' })" id="go-categories-btn">
+          <BaseButton
+            v-if="authStore.user?.role === 'admin'"
+            variant="secondary"
+            @click="router.push({ name: 'admin-products' })"
+            id="go-products-btn"
+          >
             Manage Products
           </BaseButton>
           <BaseButton variant="primary" @click="openCreate" id="add-category-btn">
@@ -108,123 +185,162 @@ const executeDelete = async () => {
       </div>
     </header>
 
-    <!-- Loading -->
-    <div v-if="categoryStore.loading" class="table-loading">
-      <div v-for="n in 4" :key="n" class="skeleton-row motion-shimmer"></div>
-    </div>
+    <!-- Table Composition -->
+    <BaseTable
+      :headers="tableHeaders"
+      :items="categoryStore.categories"
+      :loading="categoryStore.loading"
+      emptyText="No Categories Found"
+    >
+      <!-- Cell: Image -->
+      <template #cell(imageUrl)="{ item }">
+        <div class="cat-image-cell">
+          <img v-if="item.imageUrl" :src="item.imageUrl" :alt="item.name" class="cat-thumb" />
+          <span v-else class="cat-thumb-placeholder">
+            <Tag class="placeholder-icon" />
+          </span>
+        </div>
+      </template>
 
-    <!-- Empty -->
-    <div v-else-if="categoryStore.categories.length === 0" class="empty-state">
-      <Tag class="empty-icon" />
-      <h3>No categories yet</h3>
-      <p>Create your first category to start organizing products.</p>
-    </div>
+      <!-- Cell: Name -->
+      <template #cell(name)="{ item }">
+        <span class="name-text">{{ item.name }}</span>
+      </template>
 
-    <!-- Category Table -->
-    <div v-else class="table-wrapper">
-      <table class="data-table" aria-label="Categories list">
-        <thead>
-          <tr>
-            <th>Image</th>
-            <th>Name</th>
-            <th>Slug</th>
-            <th>Description</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="cat in categoryStore.categories" :key="cat._id" class="table-row">
-            <td>
-              <div class="cat-image-cell">
-                <img v-if="cat.imageUrl" :src="cat.imageUrl" :alt="cat.name" class="cat-thumb" />
-                <span v-else class="cat-thumb-placeholder">
-                  <Tag class="placeholder-icon" />
-                </span>
-              </div>
-            </td>
-            <td class="name-cell">{{ cat.name }}</td>
-            <td class="mono-cell">{{ cat.slug }}</td>
-            <td class="desc-cell">{{ cat.description || '—' }}</td>
-            <td class="actions-cell">
-              <div class="actions-wrapper">
-                <button class="action-btn edit-btn" @click="openEdit(cat)" :aria-label="`Edit ${cat.name}`">
-                  <Pencil class="action-icon" />
-                </button>
-                <button class="action-btn delete-btn" @click="openDeleteConfirm(cat)"
-                  :aria-label="`Delete ${cat.name}`">
-                  <Trash2 class="action-icon" />
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+      <!-- Cell: Slug -->
+      <template #cell(slug)="{ item }">
+        <span class="mono-text">{{ item.slug }}</span>
+      </template>
 
-    <!-- Create / Edit Modal -->
-    <Teleport to="body">
-      <div v-if="showModal" class="modal-overlay" @click.self="closeModal" role="dialog" :aria-label="modalTitle">
-        <div class="modal-card motion-scale-in">
-          <h2 class="modal-title">{{ modalTitle }}</h2>
+      <!-- Cell: Description -->
+      <template #cell(description)="{ item }">
+        <span class="desc-text">{{ item.description || '—' }}</span>
+      </template>
 
-          <div class="form-group">
+      <!-- Cell: Status -->
+      <template #cell(status)="{ item }">
+        <span
+          class="status-badge"
+          :class="`status-badge--${item.status || 'active'}`"
+        >
+          {{ item.status || 'active' }}
+        </span>
+      </template>
+
+      <!-- Cell: Actions -->
+      <template #cell(actions)="{ item }">
+        <div class="actions-wrapper">
+          <button class="action-btn edit-btn" @click="openEdit(item)" :aria-label="`Edit ${item.name}`">
+            <Pencil class="action-icon" />
+          </button>
+          
+          <button
+            v-if="item.status !== 'deleted'"
+            class="action-btn delete-btn"
+            @click="handleDeleteCategory(item)"
+            :aria-label="`Delete ${item.name}`"
+          >
+            <Trash2 class="action-icon" />
+          </button>
+
+          <button
+            v-else
+            class="action-btn restore-btn"
+            @click="handleRestoreCategory(item)"
+            :aria-label="`Restore ${item.name}`"
+            title="Restore Category"
+          >
+            <RotateCcw class="action-icon" />
+          </button>
+        </div>
+      </template>
+
+      <!-- Custom Empty State -->
+      <template #empty>
+        <div class="empty-state-container">
+          <Tag class="empty-state-icon" />
+          <h3>No categories found</h3>
+          <p>Create your first category to start organizing products.</p>
+        </div>
+      </template>
+    </BaseTable>
+
+    <!-- Create / Edit Modal Dialog -->
+    <BaseModal :show="showModal" :title="modalTitle" @close="closeModal">
+      <form @submit.prevent="handleSave" id="category-form">
+        <div class="form-inputs-wrap">
+          <div class="input-group">
             <label class="form-label" for="cat-name">Category Name *</label>
-            <input id="cat-name" v-model="form.name" type="text" class="form-input" placeholder="e.g. Leather Goods" />
+            <input
+              id="cat-name"
+              v-model="form.name"
+              type="text"
+              class="form-input"
+              placeholder="e.g. Leather Goods"
+              required
+            />
           </div>
 
-          <div class="form-group">
+          <div class="input-group">
             <label class="form-label" for="cat-desc">Description</label>
-            <textarea id="cat-desc" v-model="form.description" class="form-textarea" placeholder="Brief description..."
-              rows="3"></textarea>
+            <textarea
+              id="cat-desc"
+              v-model="form.description"
+              class="form-textarea"
+              placeholder="Brief description..."
+              rows="3"
+            ></textarea>
           </div>
 
-          <div class="form-group">
+          <div class="input-group">
             <label class="form-label" for="cat-image">Image URL</label>
-            <input id="cat-image" v-model="form.imageUrl" type="url" class="form-input" placeholder="https://..." />
-          </div>
-
-          <div class="modal-actions">
-            <BaseButton variant="secondary" @click="closeModal">Cancel</BaseButton>
-            <BaseButton variant="primary" :disabled="saving || !form.name.trim()" @click="handleSave"
-              id="save-category-btn">
-              {{ saving ? 'Saving...' : (editingId ? 'Update' : 'Create') }}
-            </BaseButton>
+            <input
+              id="cat-image"
+              v-model="form.imageUrl"
+              type="url"
+              class="form-input"
+              placeholder="https://..."
+            />
           </div>
         </div>
-      </div>
-    </Teleport>
+      </form>
+      <template #footer>
+        <BaseButton variant="secondary" @click="closeModal">Cancel</BaseButton>
+        <BaseButton
+          variant="primary"
+          type="submit"
+          form="category-form"
+          :disabled="saving || !form.name.trim()"
+          id="save-category-btn"
+        >
+          {{ saving ? 'Saving...' : (editingId ? 'Save Changes' : 'Create Category') }}
+        </BaseButton>
+      </template>
+    </BaseModal>
 
-    <!-- Delete Confirmation Modal -->
-    <Teleport to="body">
-      <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="closeDeleteConfirm" role="dialog"
-        aria-label="Confirm Deletion">
-        <div class="modal-card modal-card--sm motion-scale-in">
-          <h2 class="modal-title">Delete Category</h2>
-          <p class="delete-warning-text">
-            Are you sure you want to delete <strong>{{ catToDelete?.name }}</strong>? This action cannot be undone and
-            will remove it permanently.
-          </p>
-          <div class="modal-actions">
-            <BaseButton variant="secondary" @click="closeDeleteConfirm">Cancel</BaseButton>
-            <BaseButton variant="primary" class="btn--danger" @click="executeDelete" id="confirm-delete-category-btn">
-              Delete Category
-            </BaseButton>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- Global Confirmation Dialog Overlay -->
+    <BaseConfirmDialog
+      v-model="showConfirmDialog"
+      :title="confirmDialogTitle"
+      :message="confirmDialogMessage"
+      :variant="confirmDialogVariant"
+      :loading="confirmDialogLoading"
+      @confirm="handleConfirmDialogAction"
+      @cancel="handleConfirmDialogCancel"
+    />
   </div>
 </template>
 
 <style scoped>
-.admin-view {
-  width: 100%;
+.admin-categories-page {
+  padding: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
+/* Page Header */
 .page-header {
-  margin-bottom: 40px;
-  padding-bottom: 24px;
-  border-bottom: 2px solid var(--color-border);
+  margin-bottom: 32px;
 }
 
 .header-row {
@@ -247,198 +363,17 @@ const executeDelete = async () => {
 
 .page-title {
   font-family: var(--font-heading);
-  font-size: 2.2rem;
-  font-weight: 700;
+  font-size: 2rem;
+  font-weight: 800;
   color: var(--color-primary);
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
 .btn-icon {
   width: 16px;
   height: 16px;
-  display: inline-block;
-  vertical-align: -3px;
   margin-right: 6px;
-}
-
-/* Table */
-.table-loading {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.skeleton-row {
-  height: 60px;
-  border-radius: var(--radius-md);
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 80px 40px;
-  text-align: center;
-  background-color: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-lg);
-}
-
-.empty-icon {
-  width: 40px;
-  height: 40px;
-  color: var(--color-muted);
-}
-
-.table-wrapper {
-  overflow-x: auto;
-  border-radius: var(--radius-lg);
-  border: 2px solid var(--color-border);
-  box-shadow: var(--shadow-card);
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
-  background-color: var(--color-surface);
-  border-radius: var(--radius-lg);
-}
-
-.data-table thead {
-  background-color: var(--color-bg-alt);
-}
-
-.data-table th {
-  text-align: left;
-  padding: 14px 20px;
-  font-family: var(--font-display);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-muted);
-  border-bottom: 2px solid var(--color-border);
-}
-
-.table-row {
-  border-bottom: 1px solid var(--color-border);
-  transition: background-color var(--duration-fast) var(--ease-out);
-}
-
-.table-row:hover {
-  background-color: var(--color-bg-alt);
-}
-
-.table-row:last-child {
-  border-bottom: none;
-}
-
-.data-table td {
-  padding: 14px 20px;
-  color: var(--color-text);
-  vertical-align: middle;
-}
-
-.cat-image-cell {
-  width: 52px;
-}
-
-.cat-thumb {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-sm);
-  object-fit: cover;
-  border: 1px solid var(--color-border);
-}
-
-.cat-thumb-placeholder {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-sm);
-  background-color: var(--color-bg-alt);
-  border: 1px solid var(--color-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.placeholder-icon {
-  width: 20px;
-  height: 20px;
-  color: var(--color-muted);
-}
-
-.name-cell {
-  font-weight: 700;
-  color: var(--color-primary);
-}
-
-.mono-cell {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: var(--color-muted);
-}
-
-.desc-cell {
-  color: var(--color-muted);
-  max-width: 260px;
-}
-
-.actions-cell {
-  vertical-align: middle;
-}
-
-.actions-wrapper {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  border: none;
-  cursor: pointer;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 0.8rem;
-  transition: all var(--duration-fast) var(--ease-spring);
-}
-
-.action-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.edit-btn {
-  background-color: var(--color-bg-alt);
-  color: var(--color-primary);
-}
-
-.edit-btn:hover {
-  background-color: var(--color-primary);
-  color: white;
-}
-
-.delete-btn {
-  background-color: rgba(229, 72, 77, 0.08);
-  color: var(--color-danger);
-}
-
-.delete-btn:hover {
-  background-color: var(--color-danger);
-  color: white;
-}
-
-.delete-btn--confirm {
-  background-color: var(--color-danger);
-  color: white;
 }
 
 .header-actions {
@@ -446,102 +381,205 @@ const executeDelete = async () => {
   gap: 12px;
 }
 
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(17, 24, 39, 0.5);
-  backdrop-filter: blur(4px);
+/* Category Image Cell */
+.cat-image-cell {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background-color: var(--color-bg-alt);
+  border: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
-  padding: 24px;
 }
 
-.modal-card {
-  background-color: var(--color-surface);
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-xl);
-  padding: 40px;
+.cat-thumb {
   width: 100%;
-  max-width: 520px;
-  box-shadow: 0 32px 80px rgba(16, 16, 24, 0.16);
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  height: 100%;
+  object-fit: cover;
 }
 
-.modal-title {
-  font-family: var(--font-heading);
-  font-size: 1.8rem;
+.cat-thumb-placeholder {
+  color: var(--color-muted);
+}
+
+.placeholder-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.name-text {
   font-weight: 700;
-  color: var(--color-primary);
-  margin: 0;
+  color: var(--color-text);
 }
 
-.form-group {
+.mono-text {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+
+.desc-text {
+  color: var(--color-muted);
+  max-width: 400px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+/* Status badge */
+.status-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  text-transform: capitalize;
+  display: inline-block;
+}
+
+.status-badge--active {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+}
+
+.status-badge--deleted {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+/* Actions */
+.actions-wrapper {
+  display: inline-flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.action-btn {
+  background: none;
+  border: 1px solid var(--color-border);
+  padding: 6px;
+  border-radius: var(--radius-md);
+  color: var(--color-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.action-btn:hover {
+  background-color: var(--color-bg-alt);
+  color: var(--color-text);
+  border-color: var(--color-muted);
+}
+
+.delete-btn:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background-color: rgba(229, 72, 77, 0.05);
+}
+
+.restore-btn:hover {
+  border-color: var(--color-success);
+  color: var(--color-success);
+  background-color: rgba(22, 163, 74, 0.05);
+}
+
+.action-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Form layout */
+.form-inputs-wrap {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .form-label {
-  font-family: var(--font-display);
-  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-text);
 }
 
-.form-input,
+.form-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
 .form-textarea {
   width: 100%;
-  padding: 12px 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background-color: var(--color-bg-alt);
-  border: 2px solid var(--color-border);
-  color: var(--color-text);
   font-family: var(--font-sans);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
+  background-color: var(--color-bg);
+  color: var(--color-text);
   box-sizing: border-box;
-  transition: border-color var(--duration-base) var(--ease-out);
-}
-
-.form-input:focus,
-.form-textarea:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px rgba(15, 61, 94, 0.08);
-}
-
-.form-textarea {
   resize: vertical;
 }
 
-.modal-actions {
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
+/* Empty State */
+.empty-state-container {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 12px;
+  max-width: 360px;
+  margin: 0 auto;
+  text-align: center;
 }
 
-.modal-card--sm {
-  max-width: 460px;
+.empty-state-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--color-muted);
+  opacity: 0.5;
+  margin-bottom: 8px;
 }
 
-.delete-warning-text {
-  font-family: var(--font-sans);
-  font-size: 0.95rem;
+.empty-state-container h3 {
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 700;
   color: var(--color-text);
-  line-height: 1.5;
   margin: 0;
 }
 
-.btn--danger {
-  background-color: var(--color-danger) !important;
-  color: white !important;
-}
-
-.btn--danger:hover {
-  background-color: #b91c1c !important;
+.empty-state-container p {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  margin: 0;
+  line-height: 1.5;
 }
 </style>
