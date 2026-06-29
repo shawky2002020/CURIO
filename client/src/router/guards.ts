@@ -1,5 +1,6 @@
 import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router';
 import { useAuthStore } from '../stores/auth.store.js';
+import { useToastStore } from '../stores/toast.store.js';
 import type { UserRole } from '../types/auth.types.js';
 
 /**
@@ -37,20 +38,21 @@ export const authGuard = (
  */
 export const roleGuard = (allowedRoles: UserRole[]) => {
   return (
-    _to: RouteLocationNormalized,
+    to: RouteLocationNormalized,
     _from: RouteLocationNormalized,
     next: NavigationGuardNext
   ) => {
     const authStore = useAuthStore();
+    const toastStore = useToastStore();
     
     if (!authStore.isAuthenticated) {
-      return next({ name: 'login' });
+      return next({ name: 'login', query: { redirect: to.fullPath } });
     }
 
     const userRole = authStore.user?.role;
     if (!userRole || !allowedRoles.includes(userRole)) {
-      // Redirect to a 403 Forbidden page or Home
-      return next({ name: 'forbidden' });
+      toastStore.error('Access Denied');
+      return next({ name: 'home' });
     }
     
     next();

@@ -43,6 +43,18 @@ const routes: RouteRecordRaw[] = [
         beforeEnter: authGuard,
       },
       {
+        path: 'admin/dashboard',
+        name: 'admin-dashboard',
+        component: () => import('../modules/admin/pages/AdminDashboardPage.vue'),
+        beforeEnter: roleGuard(['admin']),
+      },
+      {
+        path: 'seller/dashboard',
+        name: 'seller-dashboard',
+        component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
+        beforeEnter: roleGuard(['seller']),
+      },
+      {
         path: 'admin/products',
         name: 'admin-products',
         component: () => import('../modules/admin/pages/AdminProductsPage.vue'),

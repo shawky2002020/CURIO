@@ -42,3 +42,6 @@ out/
 **/.agents/
 skills-lock.json
 **/skills-lock.json
+.specify/
+AGENTS.md
+specs/

@@ -13,10 +13,21 @@ const authStore = useAuthStore();
 const toastStore = useToastStore();
 
 // Redirect user if already authenticated
+const getDashboardRoute = (role?: string) => {
+  switch (role) {
+    case 'admin':
+      return '/admin/dashboard';
+    case 'seller':
+      return '/seller/dashboard';
+    default:
+      return '/';
+  }
+};
+
 const checkAuthAndRedirect = () => {
   if (authStore.isAuthenticated) {
     const redirect = route.query.redirect as string;
-    router.replace(redirect || '/');
+    router.replace(redirect || getDashboardRoute(authStore.user?.role));
   }
 };
 
@@ -33,7 +44,7 @@ watch(() => authStore.isAuthenticated, () => {
 const handleSuccess = () => {
   toastStore.success('Welcome back to your Curio world.');
   const redirect = route.query.redirect as string;
-  router.push(redirect || '/');
+  router.push(redirect || getDashboardRoute(authStore.user?.role));
 };
 </script>
 
