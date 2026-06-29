@@ -170,6 +170,44 @@ export interface PaginatedReviewsData {
   page: number;
 }
 
+export interface CouponRegistryItem {
+  _id: string;
+  code: string;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+  isActive: boolean;
+  usageLimit?: number;
+  usedCount: number;
+  expirationDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaginatedCouponsData {
+  coupons: CouponRegistryItem[];
+  total: number;
+  pages: number;
+  page: number;
+}
+
+export interface BannerRegistryItem {
+  _id: string;
+  title: string;
+  subtitle?: string;
+  imageUrl: string;
+  linkUrl?: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaginatedBannersData {
+  banners: BannerRegistryItem[];
+  total: number;
+  pages: number;
+  page: number;
+}
+
 export const adminApi = {
   async fetchDashboardData(): Promise<ApiResponse<DashboardData>> {
     const response = await http.get<ApiResponse<DashboardData>>('/admin/dashboard');
@@ -247,6 +285,86 @@ export const adminApi = {
 
   async deleteReview(id: string): Promise<ApiResponse<null>> {
     const response = await http.delete<ApiResponse<null>>(`/admin/reviews/${id}`);
+    return response.data;
+  },
+
+  async fetchCoupons(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<ApiResponse<PaginatedCouponsData>> {
+    const response = await http.get<ApiResponse<PaginatedCouponsData>>('/admin/coupons', { params });
+    return response.data;
+  },
+
+  async createCoupon(payload: {
+    code: string;
+    discountType: 'percentage' | 'fixed';
+    discountValue: number;
+    isActive?: boolean;
+    usageLimit?: number;
+    expirationDate?: string;
+  }): Promise<ApiResponse<CouponRegistryItem>> {
+    const response = await http.post<ApiResponse<CouponRegistryItem>>('/admin/coupons', payload);
+    return response.data;
+  },
+
+  async updateCoupon(
+    id: string,
+    payload: {
+      code?: string;
+      discountType?: 'percentage' | 'fixed';
+      discountValue?: number;
+      isActive?: boolean;
+      usageLimit?: number;
+      expirationDate?: string | null;
+    }
+  ): Promise<ApiResponse<CouponRegistryItem>> {
+    const response = await http.patch<ApiResponse<CouponRegistryItem>>(`/admin/coupons/${id}`, payload);
+    return response.data;
+  },
+
+  async deleteCoupon(id: string): Promise<ApiResponse<null>> {
+    const response = await http.delete<ApiResponse<null>>(`/admin/coupons/${id}`);
+    return response.data;
+  },
+
+  async fetchBanners(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }): Promise<ApiResponse<PaginatedBannersData>> {
+    const response = await http.get<ApiResponse<PaginatedBannersData>>('/admin/banners', { params });
+    return response.data;
+  },
+
+  async createBanner(payload: {
+    title: string;
+    subtitle?: string;
+    imageUrl: string;
+    linkUrl?: string;
+    status?: 'active' | 'inactive';
+  }): Promise<ApiResponse<BannerRegistryItem>> {
+    const response = await http.post<ApiResponse<BannerRegistryItem>>('/admin/banners', payload);
+    return response.data;
+  },
+
+  async updateBanner(
+    id: string,
+    payload: {
+      title?: string;
+      subtitle?: string;
+      imageUrl?: string;
+      linkUrl?: string;
+      status?: 'active' | 'inactive';
+    }
+  ): Promise<ApiResponse<BannerRegistryItem>> {
+    const response = await http.patch<ApiResponse<BannerRegistryItem>>(`/admin/banners/${id}`, payload);
+    return response.data;
+  },
+
+  async deleteBanner(id: string): Promise<ApiResponse<null>> {
+    const response = await http.delete<ApiResponse<null>>(`/admin/banners/${id}`);
     return response.data;
   },
 };

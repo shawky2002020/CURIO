@@ -111,6 +111,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../modules/admin/pages/AdminReviewsPage.vue'),
         beforeEnter: roleGuard(['admin']),
       },
+      {
+        path: 'coupons',
+        name: 'admin-coupons',
+        component: () => import('../modules/admin/pages/AdminCouponsPage.vue'),
+        beforeEnter: roleGuard(['admin']),
+      },
+      {
+        path: 'banners',
+        name: 'admin-banners',
+        component: () => import('../modules/admin/pages/AdminBannersPage.vue'),
+        beforeEnter: roleGuard(['admin']),
+      },
     ],
   },
   {

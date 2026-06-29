@@ -2,6 +2,7 @@
 import { onMounted, ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useCartStore } from '../../../stores/cart.store.js';
+import { cartApi, type ActivePromoInfo } from '../../../api/cart.api.js';
 import BaseButton from '../../../components/ui/BaseButton.vue';
 import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, Sparkles } from '@lucide/vue';
 
@@ -10,11 +11,20 @@ const cartStore = useCartStore();
 
 const promoCode = ref('');
 const applyingPromo = ref(false);
+const activePromos = ref<ActivePromoInfo[]>([]);
 
 onMounted(async () => {
   await cartStore.fetchCart();
   if (cartStore.cart?.promoCode) {
     promoCode.value = cartStore.cart.promoCode;
+  }
+  try {
+    const res = await cartApi.fetchActivePromos();
+    if (res.success && res.data) {
+      activePromos.value = res.data;
+    }
+  } catch (err) {
+    console.error('Failed to load active promos:', err);
   }
 });
 
@@ -60,6 +70,12 @@ const handleApplyPromo = async () => {
   } finally {
     applyingPromo.value = false;
   }
+};
+
+const handleApplySuggestedPromo = async (code: string) => {
+  if (cartStore.cart?.promoCode) return;
+  promoCode.value = code;
+  await handleApplyPromo();
 };
 
 const handleRemovePromo = async () => {
@@ -219,6 +235,26 @@ const getProductImage = (item: any) => {
             <!-- Feedback -->
             <div v-if="cartStore.cart?.promoCode" class="promo-feedback promo-feedback--success">
               <Sparkles class="promo-fb-icon" /> Applied promo code: {{ cartStore.cart.promoCode }}
+            </div>
+
+            <!-- Suggested Offers -->
+            <div v-if="activePromos.length > 0 && !cartStore.cart?.promoCode" class="promo-suggestions">
+              <span class="suggestions-label">Available Offers:</span>
+              <div class="suggestions-list">
+                <button
+                  v-for="promo in activePromos"
+                  :key="promo.code"
+                  type="button"
+                  class="promo-badge-btn"
+                  @click="handleApplySuggestedPromo(promo.code)"
+                  title="Click to apply"
+                >
+                  <span class="badge-code">{{ promo.code }}</span>
+                  <span class="badge-discount">
+                    ({{ promo.discountType === 'percentage' ? `${promo.discountValue}%` : `$${promo.discountValue}` }} Off)
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -679,6 +715,62 @@ const getProductImage = (item: any) => {
 .promo-fb-icon {
   width: 14px;
   height: 14px;
+}
+
+.promo-suggestions {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+}
+
+.suggestions-label {
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.suggestions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.promo-badge-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: var(--color-bg-alt);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.promo-badge-btn:hover {
+  border-color: var(--color-accent);
+  background-color: var(--color-surface);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.badge-code {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 805;
+  color: var(--color-accent);
+}
+
+.badge-discount {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 /* Price Breakdown */

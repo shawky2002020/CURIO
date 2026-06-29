@@ -95,6 +95,18 @@ export interface OrdersHistoryApiResponse {
   data: OrderData[];
 }
 
+export interface ActivePromoInfo {
+  code: string;
+  discountType: 'percentage' | 'fixed';
+  discountValue: number;
+}
+
+export interface ActivePromosApiResponse {
+  success: boolean;
+  message: string;
+  data: ActivePromoInfo[];
+}
+
 export const cartApi = {
   getCart: async (): Promise<CartApiResponse> => {
     const response = await http.get('/cart');
@@ -159,6 +171,11 @@ export const cartApi = {
 
   updateOrderStatus: async (orderId: string, status: string): Promise<OrderApiResponse> => {
     const response = await http.patch(`/orders/${orderId}/status`, { status });
+    return response.data;
+  },
+
+  fetchActivePromos: async (): Promise<ActivePromosApiResponse> => {
+    const response = await http.get('/cart/active-promos');
     return response.data;
   },
 };
