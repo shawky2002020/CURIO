@@ -10,6 +10,7 @@ import productRoutes from './modules/products/product.routes.js';
 import categoryRoutes from './modules/products/category.routes.js';
 import { cartRouter, checkoutRouter, orderRouter } from './modules/cart/cart.routes.js';
 import adminRoutes from './modules/admin/admin.routes.js';
+import bannerRoutes from './modules/banners/banner.routes.js';
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use('/api/cart', cartRouter);
 app.use('/api/checkout', checkoutRouter);
 app.use('/api/orders', orderRouter);
 app.use('/api/admin', adminRoutes);
+app.use('/api/banners', bannerRoutes);
 
 // Health Check
 app.get('/health', (req, res) => {

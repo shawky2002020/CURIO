@@ -4,6 +4,7 @@ import { User } from './modules/users/user.model.js';
 import { Category } from './modules/products/category.model.js';
 import { Product } from './modules/products/product.model.js';
 import { PromoCode } from './modules/cart/promo.model.js';
+import { Banner } from './modules/banners/banner.model.js';
 import { hashPassword } from './utils/hashPassword.js';
 
 const seedDatabase = async () => {
@@ -17,6 +18,7 @@ const seedDatabase = async () => {
     await Category.deleteMany({});
     await Product.deleteMany({});
     await PromoCode.deleteMany({});
+    await Banner.deleteMany({});
 
     // 1. Seed Users
     console.log('[Seeder] Seeding users...');
@@ -123,6 +125,25 @@ const seedDatabase = async () => {
         discountValue: 10,
         isActive: true,
         expirationDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      },
+    ]);
+
+    // 5. Seed Banners
+    console.log('[Seeder] Seeding homepage banners...');
+    await Banner.insertMany([
+      {
+        title: 'Modernist Stoneware',
+        subtitle: 'Handcrafted vases and accessories built for modernist interiors.',
+        imageUrl: 'https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?q=80&w=1200',
+        linkUrl: '/catalog',
+        status: 'active',
+      },
+      {
+        title: 'The Minimalist Curation',
+        subtitle: 'Explore high-end designer pieces tailored for minimalist workspaces.',
+        imageUrl: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=1200',
+        linkUrl: '/catalog',
+        status: 'active',
       },
     ]);
 
