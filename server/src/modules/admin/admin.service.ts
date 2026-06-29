@@ -4,6 +4,7 @@ import { Order } from '../cart/order.model.js';
 import { Category } from '../products/category.model.js';
 import { Review } from '../products/review.model.js';
 import { PromoCode } from '../cart/promo.model.js';
+import { Setting } from './setting.model.js';
 import { productService } from '../products/product.service.js';
 import { ApiError } from '../../utils/ApiError.js';
 import type {
@@ -593,6 +594,53 @@ class AdminService {
       throw new ApiError(404, 'Coupon not found.', 'NOT_FOUND');
     }
     await coupon.deleteOne();
+  }
+
+  /**
+   * Fetch all platform settings with fallback defaults.
+   */
+  public async getSettings() {
+    const list = await Setting.find({});
+    const map: Record<string, any> = {};
+    for (const item of list) {
+      map[item.key] = item.value;
+    }
+    return {
+      taxRate: map.taxRate !== undefined ? map.taxRate : 10,
+      freeShippingThreshold: map.freeShippingThreshold !== undefined ? map.freeShippingThreshold : 100,
+      shippingCost: map.shippingCost !== undefined ? map.shippingCost : 10,
+      contactEmail: map.contactEmail !== undefined ? map.contactEmail : 'support@curio.com',
+    };
+  }
+
+  /**
+   * Update settings fields in bulk.
+   */
+  public async updateSettings(payload: Record<string, any>) {
+    const keys = ['taxRate', 'freeShippingThreshold', 'shippingCost', 'contactEmail'];
+    for (const key of keys) {
+      if (payload[key] !== undefined) {
+        let val = payload[key];
+        if (key === 'taxRate' || key === 'freeShippingThreshold' || key === 'shippingCost') {
+          val = Number(val);
+          if (isNaN(val) || val < 0) continue;
+        }
+        await Setting.findOneAndUpdate(
+          { key },
+          { key, value: val },
+          { upsert: true, new: true }
+        );
+      }
+    }
+    return this.getSettings();
+  }
+
+  /**
+   * Helper to retrieve individual platform settings dynamically.
+   */
+  public async getSettingValue(key: string, defaultValue: any) {
+    const doc = await Setting.findOne({ key });
+    return doc ? doc.value : defaultValue;
   }
 }
 

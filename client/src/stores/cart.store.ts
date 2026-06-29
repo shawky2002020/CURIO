@@ -13,6 +13,7 @@ export const useCartStore = defineStore('cart', () => {
     discount: 0,
     shipping: 0,
     tax: 0,
+    taxRate: 10,
     total: 0,
   });
   const loading = ref(false);

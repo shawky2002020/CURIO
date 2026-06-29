@@ -4,6 +4,7 @@ import { Product } from '../products/product.model.js';
 import { Cart, ICart } from './cart.model.js';
 import { PromoCode } from './promo.model.js';
 import { ICartTotals } from './cart.types.js';
+import { Setting } from '../admin/setting.model.js';
 
 export class CartService {
   /**
@@ -268,11 +269,22 @@ export class CartService {
       }
     }
 
-    // Flat shipping rate of $10, free over $100 subtotal
-    const shipping = subtotal > 0 && subtotal < 100 ? 10 : 0;
-    // 10% tax rate on the taxable amount (subtotal - discount)
+    // Retrieve current settings from database with fallback defaults
+    const [taxRateSetting, shippingThresholdSetting, shippingCostSetting] = await Promise.all([
+      Setting.findOne({ key: 'taxRate' }),
+      Setting.findOne({ key: 'freeShippingThreshold' }),
+      Setting.findOne({ key: 'shippingCost' }),
+    ]);
+
+    const taxRate = taxRateSetting ? Number(taxRateSetting.value) : 10;
+    const freeShippingThreshold = shippingThresholdSetting ? Number(shippingThresholdSetting.value) : 100;
+    const shippingCost = shippingCostSetting ? Number(shippingCostSetting.value) : 10;
+
+    // Flat shipping rate, free over threshold
+    const shipping = subtotal > 0 && subtotal < freeShippingThreshold ? shippingCost : 0;
+    // tax percentage rate on the taxable amount (subtotal - discount)
     const taxableAmount = Math.max(0, subtotal - discount);
-    const tax = Math.round(taxableAmount * 0.1 * 100) / 100;
+    const tax = Math.round(taxableAmount * (taxRate / 100) * 100) / 100;
     const total = Math.round((taxableAmount + shipping + tax) * 100) / 100;
 
     return {
@@ -290,6 +302,7 @@ export class CartService {
         discount,
         shipping,
         tax,
+        taxRate,
         total,
       },
     };

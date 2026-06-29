@@ -24,5 +24,7 @@ router.get('/banners', bannerController.getAllBanners);
 router.post('/banners', bannerController.createBanner);
 router.patch('/banners/:id', bannerController.updateBanner);
 router.delete('/banners/:id', bannerController.deleteBanner);
+router.get('/settings', adminController.getSettings);
+router.patch('/settings', adminController.updateSettings);
 
 export default router;

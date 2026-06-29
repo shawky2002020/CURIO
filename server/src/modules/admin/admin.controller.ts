@@ -150,6 +150,32 @@ class AdminController {
       message: 'Coupon deleted successfully.',
     });
   });
+
+  /**
+   * GET /api/admin/settings
+   * Retrieves platform configuration settings.
+   */
+  public getSettings = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const data = await adminService.getSettings();
+    res.status(200).json({
+      success: true,
+      message: 'Platform settings retrieved successfully.',
+      data,
+    });
+  });
+
+  /**
+   * PATCH /api/admin/settings
+   * Updates platform configuration settings in bulk.
+   */
+  public updateSettings = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const data = await adminService.updateSettings(req.body);
+    res.status(200).json({
+      success: true,
+      message: 'Platform settings updated successfully.',
+      data,
+    });
+  });
 }
 
 export const adminController = new AdminController();

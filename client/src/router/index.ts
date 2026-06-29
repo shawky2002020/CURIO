@@ -123,6 +123,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../modules/admin/pages/AdminBannersPage.vue'),
         beforeEnter: roleGuard(['admin']),
       },
+      {
+        path: 'settings',
+        name: 'admin-settings',
+        component: () => import('../modules/admin/pages/AdminSettingsPage.vue'),
+        beforeEnter: roleGuard(['admin']),
+      },
     ],
   },
   {

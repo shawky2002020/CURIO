@@ -23,6 +23,7 @@ export interface ICartTotals {
   discount: number;
   shipping: number;
   tax: number;
+  taxRate?: number;
   total: number;
 }
 

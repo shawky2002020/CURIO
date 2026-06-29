@@ -29,6 +29,7 @@ export interface CartTotals {
   discount: number;
   shipping: number;
   tax: number;
+  taxRate?: number;
   total: number;
 }
 

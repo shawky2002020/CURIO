@@ -208,6 +208,13 @@ export interface PaginatedBannersData {
   page: number;
 }
 
+export interface PlatformSettings {
+  taxRate: number;
+  freeShippingThreshold: number;
+  shippingCost: number;
+  contactEmail: string;
+}
+
 export const adminApi = {
   async fetchDashboardData(): Promise<ApiResponse<DashboardData>> {
     const response = await http.get<ApiResponse<DashboardData>>('/admin/dashboard');
@@ -365,6 +372,16 @@ export const adminApi = {
 
   async deleteBanner(id: string): Promise<ApiResponse<null>> {
     const response = await http.delete<ApiResponse<null>>(`/admin/banners/${id}`);
+    return response.data;
+  },
+
+  async fetchSettings(): Promise<ApiResponse<PlatformSettings>> {
+    const response = await http.get<ApiResponse<PlatformSettings>>('/admin/settings');
+    return response.data;
+  },
+
+  async updateSettings(payload: Partial<PlatformSettings>): Promise<ApiResponse<PlatformSettings>> {
+    const response = await http.patch<ApiResponse<PlatformSettings>>('/admin/settings', payload);
     return response.data;
   },
 };

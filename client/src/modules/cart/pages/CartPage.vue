@@ -278,7 +278,7 @@ const getProductImage = (item: any) => {
             </div>
 
             <div class="summary-row">
-              <span class="summary-row-label">Registry Tax (10%)</span>
+              <span class="summary-row-label">Registry Tax ({{ cartStore.totals.taxRate }}%)</span>
               <span class="summary-row-val">${{ cartStore.totals.tax.toFixed(2) }}</span>
             </div>
 

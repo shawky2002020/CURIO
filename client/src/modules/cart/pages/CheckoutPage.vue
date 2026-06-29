@@ -330,7 +330,7 @@ const handlePlaceOrder = async () => {
             </div>
 
             <div class="summary-row">
-              <span>Registry Tax (10%)</span>
+              <span>Registry Tax ({{ cartStore.totals.taxRate }}%)</span>
               <span>${{ cartStore.totals.tax.toFixed(2) }}</span>
             </div>
 
