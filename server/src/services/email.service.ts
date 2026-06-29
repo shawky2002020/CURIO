@@ -9,31 +9,30 @@ let transporterInstance: nodemailer.Transporter | null = null;
  * Includes connection pooling configurations for high-performance enterprise delivery.
  */
 const createTransporter = (): nodemailer.Transporter => {
-  const isSmtpConfigured = 
+  const hasAuth = 
     env.EMAIL_USER && 
     env.EMAIL_USER !== 'replace_me' && 
     env.EMAIL_PASS && 
     env.EMAIL_PASS !== 'replace_me';
 
-  if (!isSmtpConfigured) {
-    throw new Error(
-      'SMTP email credentials are not configured. Please define EMAIL_USER and EMAIL_PASS in your environment variables (.env).'
-    );
-  }
-
-  return nodemailer.createTransport({
+  const transportConfig: any = {
     host: env.EMAIL_HOST,
     port: env.EMAIL_PORT,
-    secure: false,
-    auth: {
-      user: env.EMAIL_USER,
-      pass: env.EMAIL_PASS,
-    },
+    secure: env.EMAIL_PORT === 465,
     pool: true,             // Enable connection pooling
     maxConnections: 5,      // Limit simultaneous connections
     maxMessages: 100,       // Max messages per connection
     rateLimit: 10,          // Throttle to maximum 10 messages per second
-  });
+  };
+
+  if (hasAuth) {
+    transportConfig.auth = {
+      user: env.EMAIL_USER,
+      pass: env.EMAIL_PASS,
+    };
+  }
+
+  return nodemailer.createTransport(transportConfig);
 };
 
 /**

@@ -34,7 +34,7 @@ Each core module of the CURIO platform is assigned to a specific team member who
 | **Shawky Ahmad Shawky** | **Authentication & Users**<br>• User Registration & Login (Email, Phone, Google OAuth)<br>• SMTP Email Verification<br>• User Profile Management<br>• Multi-user Roles (Customer, Seller, Admin)<br>• Wishlist & Favorites | **Authentication APIs + User UI**<br>👉 [Detailed Documentation](docs/shawky-ahmad-shawky/README.md) |
 | **Member 2** | **Product Catalog**<br>• Categories Management<br>• Product Listings & Stock Availability<br>• Live Catalog Search & Filtering<br>• Reviews & Ratings | **Product APIs + Product Pages** |
 | **Moamen Alaa Soltan** | **Cart & Checkout**<br>• Shopping Cart (Add/Remove/Adjust)<br>• Order Summary & Price Breakdown<br>• Guest Checkout & Promo Codes | **Cart APIs + Checkout UI**<br> 👉 [Detailed Documentation](docs/Moamen%20Alaa%20Soltan/README.md)
-| **Member 4** | **Orders & Payments**<br>• Order Placement & Status Tracking<br>• Email Notifications & History<br>• Payment Integration (Stripe/PayPal) | **Orders APIs + Payment Gateway** |
+| **Hassan Muhammad** | **Orders & Payments**<br>• Order Placement & Status Tracking<br>• Email Notifications & History<br>• Payment Integration (Stripe/PayPal) | **Orders APIs + Payment Gateway** |
 | **Member 5** | **Admin & Seller Dashboard**<br>• Admin Panel & User Management<br>• Inventory & Product Management<br>• Seller Registration & Earnings Payout | **Admin Dashboard + Seller Dashboard** |
 
 ---

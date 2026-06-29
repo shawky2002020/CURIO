@@ -34,6 +34,8 @@ export interface IOrder extends Document {
   promoCode?: string;
   totals: IOrderTotals;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  stripeSessionId?: string;
+  paymentStatus: 'pending' | 'paid' | 'failed';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -107,6 +109,14 @@ const orderSchema = new Schema<IOrder>(
     status: {
       type: String,
       enum: ['pending', 'processing', 'shipped', 'delivered', 'cancelled'],
+      default: 'pending',
+    },
+    stripeSessionId: {
+      type: String,
+    },
+    paymentStatus: {
+      type: String,
+      enum: ['pending', 'paid', 'failed'],
       default: 'pending',
     },
   },

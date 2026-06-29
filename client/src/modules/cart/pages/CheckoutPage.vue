@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useCartStore } from '../../../stores/cart.store.js';
 import { useAuthStore } from '../../../stores/auth.store.js';
 import { useToastStore } from '../../../stores/toast.store.js';
@@ -8,6 +8,7 @@ import BaseButton from '../../../components/ui/BaseButton.vue';
 import BaseInput from '../../../components/ui/BaseInput.vue';
 import { ArrowLeft, CreditCard, Lock, Sparkles } from '@lucide/vue';
 
+const route = useRoute();
 const router = useRouter();
 const cartStore = useCartStore();
 const authStore = useAuthStore();
@@ -27,6 +28,10 @@ const errors = ref<Record<string, string>>({});
 const submitError = ref<string | null>(null);
 
 onMounted(async () => {
+  if (route.query.cancelled === 'true') {
+    toastStore.warning('Payment was cancelled. You can complete checkout when ready.');
+  }
+
   // Ensure cart is loaded
   if (!cartStore.cart) {
     await cartStore.fetchCart();
@@ -78,7 +83,7 @@ const handlePlaceOrder = async () => {
   }
 
   try {
-    const order = await cartStore.checkout({
+    const result = await cartStore.checkout({
       fullName: form.value.fullName.trim(),
       email: form.value.email.trim(),
       phone: form.value.phone.trim(),
@@ -88,8 +93,11 @@ const handlePlaceOrder = async () => {
       postalCode: form.value.postalCode.trim(),
     });
 
-    // On success, redirect to order success page with ID
-    router.push({ name: 'order-success', params: { id: order._id } });
+    if (result.checkoutUrl) {
+      window.location.href = result.checkoutUrl;
+    } else {
+      router.push({ name: 'order-success', params: { id: result.order._id } });
+    }
   } catch (err: any) {
     if (err.response?.status === 400 && err.response?.data?.errors) {
       // Backend validation errors mapping
@@ -215,9 +223,9 @@ const handlePlaceOrder = async () => {
           <div class="payment-notice-card">
             <CreditCard class="payment-icon" />
             <div class="payment-notice-details">
-              <span class="payment-notice-title">Complimentary Checkout</span>
+              <span class="payment-notice-title">Secure Payment Gateway</span>
               <span class="payment-notice-desc">
-                CURIO operates under secure handshake credentials. Credit card billing is bypassed for this curation.
+                All transactions are encrypted and processed securely via Stripe. Credit card details are never stored.
               </span>
             </div>
           </div>

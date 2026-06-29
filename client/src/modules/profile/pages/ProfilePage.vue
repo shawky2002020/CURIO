@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, computed } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useUserStore } from '../../../stores/user.store.js';
 import { useAuthStore } from '../../../stores/auth.store.js';
 import { useRouter } from 'vue-router';
@@ -7,17 +7,33 @@ import UserAvatar from '../../../components/shared/UserAvatar.vue';
 import BaseLoader from '../../../components/ui/BaseLoader.vue';
 import BaseAlert from '../../../components/ui/BaseAlert.vue';
 import BaseButton from '../../../components/ui/BaseButton.vue';
+import { cartApi } from '../../../api/cart.api.js';
+import type { OrderData } from '../../../api/cart.api.js';
 
 const userStore = useUserStore();
 const authStore = useAuthStore();
 const router = useRouter();
 
+const orders = ref<OrderData[]>([]);
+const ordersLoading = ref(false);
+const ordersError = ref<string | null>(null);
+
 onMounted(async () => {
   if (authStore.isAuthenticated) {
     try {
       await userStore.fetchProfile();
-    } catch (err) {
+      
+      // Load user order history
+      ordersLoading.value = true;
+      const response = await cartApi.getMyOrders();
+      if (response.success && response.data) {
+        orders.value = response.data;
+      }
+    } catch (err: any) {
       console.error('Failed to load profile dashboard', err);
+      ordersError.value = err.response?.data?.message || 'Failed to load order history.';
+    } finally {
+      ordersLoading.value = false;
     }
   }
 });
@@ -37,6 +53,14 @@ const userInitials = computed(() => {
     .substring(0, 2)
     .toUpperCase();
 });
+
+const formatDate = (dateStr: string) => {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+};
 </script>
 
 <template>
@@ -139,6 +163,55 @@ const userInitials = computed(() => {
             Log Out
           </BaseButton>
         </footer>
+      </section>
+
+      <!-- 3. Order History Registry -->
+      <section class="orders-section" aria-label="Order History">
+        <h3 class="section-heading">Curation Order History</h3>
+        
+        <div v-if="ordersLoading" class="orders-loading-state">
+          <div class="small-spinner"></div>
+          <span>Retrieving archived curations...</span>
+        </div>
+        <div v-else-if="ordersError" class="orders-error-state">
+          {{ ordersError }}
+        </div>
+        <div v-else-if="orders.length === 0" class="empty-orders-card">
+          <p class="empty-orders-text">No curations logged on this account yet.</p>
+          <router-link to="/">
+            <BaseButton variant="secondary" size="sm">Explore Catalog</BaseButton>
+          </router-link>
+        </div>
+        <div v-else class="orders-table-wrapper">
+          <table class="orders-table">
+            <thead>
+              <tr>
+                <th>Reference</th>
+                <th>Established</th>
+                <th>Total Value</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="order in orders" :key="order._id">
+                <td class="order-ref font-mono">{{ order._id.substring(0, 8).toUpperCase() }}...</td>
+                <td>{{ formatDate(order.createdAt) }}</td>
+                <td class="order-total font-mono">${{ order.totals.total.toFixed(2) }}</td>
+                <td>
+                  <span :class="['status-pill', `pill-${order.status}`]">
+                    {{ order.status }}
+                  </span>
+                </td>
+                <td>
+                  <router-link :to="`/orders/${order._id}`" class="view-order-link">
+                    View Registry
+                  </router-link>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   </div>
@@ -418,6 +491,162 @@ const userInitials = computed(() => {
   }
   .edit-link, .btn-dashboard-logout {
     width: 100%;
+  }
+}
+
+/* Order History styling */
+.orders-section {
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  box-shadow: var(--shadow-card);
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.orders-loading-state {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-muted);
+  font-family: var(--font-sans);
+  padding: 24px 0;
+}
+
+.small-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-accent);
+  animation: spin 1s infinite linear;
+}
+
+.orders-error-state {
+  color: var(--color-danger);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  padding: 16px 0;
+}
+
+.empty-orders-card {
+  background-color: var(--color-bg-alt);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 40px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.empty-orders-text {
+  font-family: var(--font-sans);
+  color: var(--color-muted);
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.orders-table-wrapper {
+  overflow-x: auto;
+  margin-top: 8px;
+}
+
+.orders-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+}
+
+.orders-table th {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.orders-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.orders-table tr:last-child td {
+  border-bottom: none;
+}
+
+.order-ref {
+  font-weight: 700 !important;
+  color: var(--color-primary);
+}
+
+.order-total {
+  font-weight: 700 !important;
+  color: var(--color-accent);
+}
+
+.font-mono {
+  font-family: var(--font-mono) !important;
+}
+
+.view-order-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.view-order-link:hover {
+  color: var(--color-accent-dark, #ff501c);
+}
+
+/* Status Pill extensions */
+.pill-pending {
+  background-color: rgba(107, 114, 128, 0.08);
+  color: #6b7280;
+  border-color: rgba(107, 114, 128, 0.15);
+}
+
+.pill-processing {
+  background-color: rgba(59, 130, 246, 0.08);
+  color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.15);
+}
+
+.pill-shipped {
+  background-color: rgba(245, 158, 11, 0.08);
+  color: #d97706;
+  border-color: rgba(245, 158, 11, 0.15);
+}
+
+.pill-delivered {
+  background-color: rgba(16, 185, 129, 0.08);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.15);
+}
+
+.pill-cancelled {
+  background-color: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.15);
+}
+
+@media (max-width: 640px) {
+  .orders-section {
+    padding: 24px 16px;
   }
 }
 </style>

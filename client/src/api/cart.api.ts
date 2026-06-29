@@ -68,6 +68,7 @@ export interface OrderData {
   promoCode?: string;
   totals: CartTotals;
   status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  paymentStatus?: 'pending' | 'paid' | 'failed';
   createdAt: string;
   updatedAt: string;
 }
@@ -76,6 +77,21 @@ export interface OrderApiResponse {
   success: boolean;
   message: string;
   data: OrderData;
+}
+
+export interface CheckoutApiResponse {
+  success: boolean;
+  message: string;
+  data: {
+    order: OrderData;
+    checkoutUrl?: string;
+  };
+}
+
+export interface OrdersHistoryApiResponse {
+  success: boolean;
+  message: string;
+  data: OrderData[];
 }
 
 export const cartApi = {
@@ -114,13 +130,28 @@ export const cartApi = {
     return response.data;
   },
 
-  checkout: async (shippingAddress: ShippingAddress): Promise<OrderApiResponse> => {
+  checkout: async (shippingAddress: ShippingAddress): Promise<CheckoutApiResponse> => {
     const response = await http.post('/checkout', shippingAddress);
     return response.data;
   },
 
   getOrderById: async (orderId: string): Promise<OrderApiResponse> => {
     const response = await http.get(`/orders/${orderId}`);
+    return response.data;
+  },
+
+  verifyPayment: async (orderId: string, sessionId: string): Promise<OrderApiResponse> => {
+    const response = await http.post(`/orders/${orderId}/verify-payment`, { sessionId });
+    return response.data;
+  },
+
+  getMyOrders: async (): Promise<OrdersHistoryApiResponse> => {
+    const response = await http.get('/orders');
+    return response.data;
+  },
+
+  updateOrderStatus: async (orderId: string, status: string): Promise<OrderApiResponse> => {
+    const response = await http.patch(`/orders/${orderId}/status`, { status });
     return response.data;
   },
 };

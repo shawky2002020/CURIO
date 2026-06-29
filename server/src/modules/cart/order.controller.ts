@@ -35,11 +35,72 @@ export class OrderController {
 
     const shippingAddress = { fullName, email, phone, address, city, country, postalCode };
 
-    const order = await orderService.checkout(shippingAddress, userId, guestId);
+    const { order, checkoutUrl } = await orderService.checkout(shippingAddress, userId, guestId);
 
     res.status(201).json({
       success: true,
       message: 'Order created successfully.',
+      data: {
+        order,
+        checkoutUrl,
+      },
+    });
+  });
+
+  /**
+   * POST /api/orders/:id/verify-payment
+   */
+  public verifyPayment = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { sessionId } = req.body;
+    const userId = req.cartOwner?.userId;
+    const guestId = req.cartOwner?.guestId;
+
+    const order = await orderService.verifyPayment(id, sessionId, userId, guestId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Payment verified successfully.',
+      data: order,
+    });
+  });
+
+  /**
+   * GET /api/orders
+   */
+  public getMyOrders = asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) {
+      throw new ApiError(401, 'Authentication required to fetch order history.', 'UNAUTHORIZED');
+    }
+
+    const orders = await orderService.getOrdersForRole(req.user._id.toString(), req.user.role);
+
+    res.status(200).json({
+      success: true,
+      message: 'Orders history retrieved successfully.',
+      data: orders,
+    });
+  });
+
+  /**
+   * PATCH /api/orders/:id/status
+   */
+  public updateOrderStatus = asyncHandler(async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    
+    if (!req.user) {
+      throw new ApiError(401, 'Authentication required.', 'UNAUTHORIZED');
+    }
+
+    const order = await orderService.updateOrderStatus(id, status, {
+      _id: req.user._id.toString(),
+      role: req.user.role,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Order status advanced to ${status} successfully.`,
       data: order,
     });
   });

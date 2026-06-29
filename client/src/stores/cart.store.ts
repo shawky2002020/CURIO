@@ -146,16 +146,20 @@ export const useCartStore = defineStore('cart', () => {
     }
   };
 
-  const checkout = async (shippingAddress: ShippingAddress): Promise<OrderData> => {
+  const checkout = async (shippingAddress: ShippingAddress): Promise<{ order: OrderData; checkoutUrl?: string }> => {
     loading.value = true;
     error.value = null;
     try {
       const response = await cartApi.checkout(shippingAddress);
       if (response.success && response.data) {
-        // Clear local cart state
-        cart.value = null;
-        totals.value = { subtotal: 0, discount: 0, shipping: 0, tax: 0, total: 0 };
-        toastStore.success('Order processed successfully.');
+        if (!response.data.checkoutUrl) {
+          // Direct sandbox checkout, clear local cart state
+          cart.value = null;
+          totals.value = { subtotal: 0, discount: 0, shipping: 0, tax: 0, total: 0 };
+          toastStore.success('Order processed successfully.');
+        } else {
+          toastStore.success('Redirecting to secure payment checkout...');
+        }
         return response.data;
       }
       throw new Error(response.message || 'Checkout failed');

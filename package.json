@@ -12,7 +12,8 @@
     "dev": "concurrently --kill-others-on-fail \"npm:dev:client\" \"npm:dev:server\"",
     "build:client": "npm run build --prefix client",
     "build:server": "npm run build --prefix server",
-    "build": "npm run build:server && npm run build:client"
+    "build": "npm run build:server && npm run build:client",
+    "seed": "npm run seed --prefix server"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
