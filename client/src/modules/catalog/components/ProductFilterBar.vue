@@ -58,7 +58,11 @@ const resetFilters = () => {
   emitFilters();
 };
 
-defineExpose({ resetFilters });
+const setCategoryIdExternal = (id: string) => {
+  activeCategoryId.value = id;
+};
+
+defineExpose({ resetFilters, setCategoryIdExternal });
 </script>
 
 <template>

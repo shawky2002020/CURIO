@@ -108,6 +108,21 @@ const handleFilterChange = (filters: {
 const resetAll = () => {
   filterBarRef.value?.resetFilters();
 };
+
+const selectCategoryFilter = (categoryId: string) => {
+  filterBarRef.value?.setCategoryIdExternal(categoryId);
+};
+
+const getCategoryFallbackImage = (name: string) => {
+  const n = name.toLowerCase();
+  if (n.includes('stone') || n.includes('clay')) {
+    return 'https://images.unsplash.com/photo-1612196808214-b8e1d6145a8c?q=80&w=400';
+  }
+  if (n.includes('access')) {
+    return 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?q=80&w=400';
+  }
+  return 'https://images.unsplash.com/photo-1505691938895-1758d7feb511?q=80&w=400';
+};
 </script>
 
 <template>
@@ -162,6 +177,32 @@ const resetAll = () => {
             :class="['indicator-dot', { active: index === currentSlide }]"
             @click.stop="setSlide(index)"
           ></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Curated Categories Row -->
+    <section v-if="categoryStore.categories.length > 0" class="curated-categories-section">
+      <div class="section-header-wrap">
+        <h2 class="section-title">Shop by Curation</h2>
+        <p class="section-subtitle">Select a visual collection to begin exploring modernist designs.</p>
+      </div>
+      <div class="categories-grid-row">
+        <div
+          v-for="cat in categoryStore.categories"
+          :key="cat._id"
+          class="category-curation-card"
+          @click="selectCategoryFilter(cat._id)"
+        >
+          <div
+            class="cat-card-bg"
+            :style="{ backgroundImage: `url(${cat.imageUrl || getCategoryFallbackImage(cat.name)})` }"
+          ></div>
+          <div class="cat-card-overlay"></div>
+          <div class="cat-card-content">
+            <h3 class="cat-card-name">{{ cat.name }}</h3>
+            <span class="cat-card-action">Explore Curation</span>
+          </div>
         </div>
       </div>
     </section>
@@ -396,14 +437,15 @@ const resetAll = () => {
 }
 
 .slide-glass-box {
-  background: rgba(11, 15, 25, 0.45);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-lg);
   padding: 40px;
   max-width: 520px;
   text-align: left;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
@@ -440,8 +482,8 @@ const resetAll = () => {
   align-items: center;
   gap: 8px;
   padding: 12px 24px;
-  background-color: var(--color-primary);
-  color: white;
+  background-color: #ffffff;
+  color: #0b0f19;
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
   font-size: 0.9rem;
@@ -451,6 +493,7 @@ const resetAll = () => {
 
 .slide-cta-btn:hover {
   background-color: var(--color-accent);
+  color: #ffffff;
   transform: translateX(3px);
 }
 
@@ -560,5 +603,109 @@ const resetAll = () => {
     font-size: 0.9rem;
     margin-bottom: 18px;
   }
+}
+
+/* Curated Categories Section */
+.curated-categories-section {
+  width: 100%;
+  margin-top: 24px;
+  margin-bottom: 56px;
+  text-align: left;
+}
+
+.section-header-wrap {
+  margin-bottom: 24px;
+}
+
+.section-title {
+  font-family: var(--font-heading);
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  margin: 0 0 6px 0;
+  letter-spacing: -0.02em;
+}
+
+.section-subtitle {
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.categories-grid-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+}
+
+.category-curation-card {
+  position: relative;
+  height: 220px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  align-items: flex-end;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.cat-card-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  transition: transform var(--duration-slow) var(--ease-out);
+}
+
+.category-curation-card:hover .cat-card-bg {
+  transform: scale(1.06);
+}
+
+.cat-card-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to top, rgba(11, 15, 25, 0.85) 0%, rgba(11, 15, 25, 0.2) 70%, rgba(11, 15, 25, 0.05) 100%);
+}
+
+.cat-card-content {
+  position: relative;
+  z-index: 5;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.cat-card-name {
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  font-weight: 750;
+  color: #ffffff;
+  margin: 0;
+}
+
+.cat-card-action {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.9;
+  transition: opacity var(--duration-fast);
+}
+
+.category-curation-card:hover .cat-card-action {
+  opacity: 1;
+  text-decoration: underline;
 }
 </style>
