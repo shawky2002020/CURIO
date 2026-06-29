@@ -1,9 +1,5 @@
 <script setup lang="ts">
-/**
- * AdminUsersPage
- * Administrative User Management dashboard with pagination, filtering, searching,
- * and quick-action moderation overlays.
- */
+
 import { ref, onMounted, watch } from 'vue';
 import { useAuthStore } from '../../../stores/auth.store.js';
 import { adminApi } from '../../../api/admin.api.js';
@@ -15,12 +11,15 @@ import {
   Trash2,
   ShieldAlert,
   ShieldCheck,
-  X,
   AlertTriangle,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight,
 } from '@lucide/vue';
+
+// UI Base Components
+import BaseSelect from '../../../components/ui/BaseSelect.vue';
+import BaseTable from '../../../components/ui/BaseTable.vue';
+import BasePagination from '../../../components/ui/BasePagination.vue';
+import BaseModal from '../../../components/ui/BaseModal.vue';
+import BaseConfirmDialog from '../../../components/ui/BaseConfirmDialog.vue';
 
 const authStore = useAuthStore();
 
@@ -37,8 +36,6 @@ const limitPerPage = ref(10);
 const search = ref('');
 const roleFilter = ref('');
 const statusFilter = ref('');
-
-import BaseSelect from '../../../components/ui/BaseSelect.vue';
 
 const roleFilterOptions = [
   { label: 'All Roles', value: '' },
@@ -66,10 +63,29 @@ const statusEditOptions = [
   { label: 'Deleted (Soft Delete)', value: 'deleted' },
 ];
 
+// Table configuration
+const tableHeaders = [
+  { key: 'fullName', label: 'Profile' },
+  { key: 'email', label: 'Email' },
+  { key: 'phone', label: 'Phone' },
+  { key: 'role', label: 'Role' },
+  { key: 'status', label: 'Status' },
+  { key: 'createdAt', label: 'Created At' },
+  { key: 'actions', label: 'Actions', align: 'right' as const },
+];
+
 // Modals
 const showViewModal = ref(false);
 const showEditModal = ref(false);
 const activeUser = ref<UserRegistryItem | null>(null);
+
+// Custom Confirmation Dialog state
+const showConfirmDialog = ref(false);
+const confirmDialogTitle = ref('');
+const confirmDialogMessage = ref('');
+const confirmDialogVariant = ref<'primary' | 'danger' | 'warning'>('primary');
+const confirmDialogLoading = ref(false);
+const onConfirmCallback = ref<(() => Promise<void>) | null>(null);
 
 // Edit Form Fields
 const editForm = ref({
@@ -79,6 +95,8 @@ const editForm = ref({
   role: 'customer' as 'customer' | 'seller' | 'admin',
   status: 'active' as 'active' | 'blocked' | 'deleted',
 });
+
+const editSaving = ref(false);
 
 // Toast / Notification feedback
 const feedbackMessage = ref<string | null>(null);
@@ -140,7 +158,7 @@ const handlePageChange = (page: number) => {
   fetchUsers();
 };
 
-// Avatar fallback generator
+// Avatar fallback initials generator
 const getInitials = (name: string): string => {
   if (!name) return 'U';
   return name
@@ -201,34 +219,71 @@ const closeModals = () => {
   activeUser.value = null;
 };
 
+// Orchestrate Confirmation Overlays
+const openConfirm = (
+  title: string,
+  message: string,
+  variant: 'primary' | 'danger' | 'warning',
+  onConfirm: () => Promise<void>
+) => {
+  confirmDialogTitle.value = title;
+  confirmDialogMessage.value = message;
+  confirmDialogVariant.value = variant;
+  onConfirmCallback.value = onConfirm;
+  showConfirmDialog.value = true;
+};
+
+const handleConfirmDialogAction = async () => {
+  if (onConfirmCallback.value) {
+    confirmDialogLoading.value = true;
+    try {
+      await onConfirmCallback.value();
+      showConfirmDialog.value = false;
+    } catch (err) {
+      // Errors handled inside callback
+    } finally {
+      confirmDialogLoading.value = false;
+      onConfirmCallback.value = null;
+    }
+  }
+};
+
+const handleConfirmDialogCancel = () => {
+  onConfirmCallback.value = null;
+};
+
 // Quick Moderation Action
-const handleQuickStatusChange = async (user: UserRegistryItem, newStatus: 'active' | 'blocked' | 'deleted') => {
+const handleQuickStatusChange = (user: UserRegistryItem, newStatus: 'active' | 'blocked' | 'deleted') => {
   // Lockout self-check
   if (authStore.user?.id === user._id) {
     triggerFeedback('Self-modification of status is prohibited.', 'error');
     return;
   }
 
+  const title = newStatus === 'deleted' ? 'Delete User Account' : 'Change User Status';
   const confirmMsg = newStatus === 'deleted' 
-    ? `Are you sure you want to soft delete ${user.fullName}?`
-    : `Are you sure you want to change status of ${user.fullName} to ${newStatus}?`;
+    ? `Are you sure you want to soft delete ${user.fullName}? This will restrict their account access.`
+    : `Are you sure you want to change the status of ${user.fullName} to "${newStatus}"?`;
+  const variant = newStatus === 'deleted' ? 'danger' : newStatus === 'blocked' ? 'warning' : 'primary';
 
-  if (!confirm(confirmMsg)) return;
-
-  try {
-    const response = await adminApi.updateUser(user._id, { status: newStatus });
-    if (response.success) {
-      triggerFeedback(`Successfully updated ${user.fullName}'s status to ${newStatus}.`, 'success');
-      fetchUsers();
+  openConfirm(title, confirmMsg, variant, async () => {
+    try {
+      const response = await adminApi.updateUser(user._id, { status: newStatus });
+      if (response.success) {
+        triggerFeedback(`Successfully updated ${user.fullName}'s status to ${newStatus}.`, 'success');
+        fetchUsers();
+      }
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || 'Failed to update user status.';
+      triggerFeedback(msg, 'error');
+      throw err;
     }
-  } catch (err: any) {
-    const msg = err?.response?.data?.message || 'Failed to update user status.';
-    triggerFeedback(msg, 'error');
-  }
+  });
 };
 
 const submitEditForm = async () => {
   if (!activeUser.value) return;
+  editSaving.value = true;
 
   const payload: any = {
     fullName: editForm.value.fullName,
@@ -253,6 +308,8 @@ const submitEditForm = async () => {
   } catch (err: any) {
     const msg = err?.response?.data?.message || 'Failed to save account details.';
     triggerFeedback(msg, 'error');
+  } finally {
+    editSaving.value = false;
   }
 };
 
@@ -317,268 +374,249 @@ const clearFilters = () => {
       <h3>Failed to load user list</h3>
       <p>{{ error }}</p>
       <button class="retry-btn" @click="fetchUsers">
-        <RefreshCw class="retry-icon" /> Retry
+        Retry
       </button>
     </div>
 
-    <!-- Table Loading Skeleton -->
-    <div v-else-if="loading" class="skeleton-container">
-      <div v-for="i in 5" :key="i" class="skeleton-row"></div>
-    </div>
-
-    <!-- Users registry Table -->
+    <!-- Generic Data Table composition -->
     <template v-else>
-      <div class="table-card">
-        <div class="table-scroll-wrap">
-          <table class="users-table">
-            <thead>
-              <tr>
-                <th>Profile</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Created At</th>
-                <th class="actions-header">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="user in users" :key="user._id">
-                <!-- Avatar and Name -->
-                <td>
-                  <div class="profile-cell-wrap">
-                    <div class="avatar-circle">
-                      <span class="avatar-initials">{{ getInitials(user.fullName) }}</span>
-                    </div>
-                    <span class="user-name-text">{{ user.fullName }}</span>
-                  </div>
-                </td>
-                <!-- Email -->
-                <td>{{ user.email || '—' }}</td>
-                <!-- Phone -->
-                <td>{{ user.phone || '—' }}</td>
-                <!-- Role -->
-                <td>
-                  <span class="role-badge" :style="{ backgroundColor: roleBadgeColor(user.role) + '15', color: roleBadgeColor(user.role) }">
-                    {{ user.role }}
-                  </span>
-                </td>
-                <!-- Status -->
-                <td>
-                  <span class="status-badge" :style="{ backgroundColor: statusBadgeColor(user.status) + '15', color: statusBadgeColor(user.status) }">
-                    {{ user.status }}
-                  </span>
-                </td>
-                <!-- Created At -->
-                <td class="date-cell">{{ formatDate(user.createdAt) }}</td>
-                <!-- Actions -->
-                <td>
-                  <div class="actions-buttons-wrap">
-                    <button class="action-btn" title="View details" @click="openViewModal(user)">
-                      <Eye class="action-icon" />
-                    </button>
-                    <button class="action-btn" title="Edit account" @click="openEditModal(user)">
-                      <Edit2 class="action-icon" />
-                    </button>
-                    <!-- Quick Activate / Restrict -->
-                    <button
-                      v-if="user.status === 'blocked'"
-                      class="action-btn action-activate"
-                      title="Activate account"
-                      :disabled="authStore.user?.id === user._id"
-                      @click="handleQuickStatusChange(user, 'active')"
-                    >
-                      <ShieldCheck class="action-icon" />
-                    </button>
-                    <button
-                      v-else-if="user.status === 'active'"
-                      class="action-btn action-restrict"
-                      title="Restrict/Block account"
-                      :disabled="authStore.user?.id === user._id"
-                      @click="handleQuickStatusChange(user, 'blocked')"
-                    >
-                      <ShieldAlert class="action-icon" />
-                    </button>
-                    <!-- Soft Delete -->
-                    <button
-                      v-if="user.status !== 'deleted'"
-                      class="action-btn action-delete"
-                      title="Soft delete"
-                      :disabled="authStore.user?.id === user._id"
-                      @click="handleQuickStatusChange(user, 'deleted')"
-                    >
-                      <Trash2 class="action-icon" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="!users.length">
-                <td colspan="7" class="empty-state-cell">
-                  <div class="empty-state-container">
-                    <Search class="empty-state-icon" />
-                    <h4>No Users Found</h4>
-                    <p>We couldn't find any accounts matching your search terms or filters.</p>
-                    <button class="clear-filters-btn" type="button" @click="clearFilters">Clear Filters</button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+      <BaseTable
+        :headers="tableHeaders"
+        :items="users"
+        :loading="loading"
+        emptyText="No Users Found"
+      >
+        <!-- Cell: Profile (Initials + Name) -->
+        <template #cell(fullName)="{ item }">
+          <div class="profile-cell-wrap">
+            <div class="avatar-circle">
+              <span class="avatar-initials">{{ getInitials(item.fullName) }}</span>
+            </div>
+            <span class="user-name-text">{{ item.fullName }}</span>
+          </div>
+        </template>
 
-        <!-- Pagination Footer -->
-        <footer class="pagination-footer" v-if="totalPages > 1">
-          <span class="pagination-summary">
-            Showing Page <strong>{{ currentPage }}</strong> of <strong>{{ totalPages }}</strong>
+        <!-- Cell: Email -->
+        <template #cell(email)="{ item }">
+          {{ item.email || '—' }}
+        </template>
+
+        <!-- Cell: Phone -->
+        <template #cell(phone)="{ item }">
+          {{ item.phone || '—' }}
+        </template>
+
+        <!-- Cell: Role Badge -->
+        <template #cell(role)="{ item }">
+          <span
+            class="role-badge"
+            :style="{ backgroundColor: roleBadgeColor(item.role) + '15', color: roleBadgeColor(item.role) }"
+          >
+            {{ item.role }}
           </span>
-          <div class="pagination-navigation">
+        </template>
+
+        <!-- Cell: Status Badge -->
+        <template #cell(status)="{ item }">
+          <span
+            class="status-badge"
+            :style="{ backgroundColor: statusBadgeColor(item.status) + '15', color: statusBadgeColor(item.status) }"
+          >
+            {{ item.status }}
+          </span>
+        </template>
+
+        <!-- Cell: Created At -->
+        <template #cell(createdAt)="{ item }">
+          <span class="date-cell">{{ formatDate(item.createdAt) }}</span>
+        </template>
+
+        <!-- Cell: Actions -->
+        <template #cell(actions)="{ item }">
+          <div class="actions-buttons-wrap">
+            <button class="action-btn" title="View details" @click="openViewModal(item)">
+              <Eye class="action-icon" />
+            </button>
+            <button class="action-btn" title="Edit account" @click="openEditModal(item)">
+              <Edit2 class="action-icon" />
+            </button>
+            <!-- Quick Activate / Restrict -->
             <button
-              class="pagination-btn"
-              :disabled="currentPage === 1"
-              @click="handlePageChange(currentPage - 1)"
+              v-if="item.status === 'blocked'"
+              class="action-btn action-activate"
+              title="Activate account"
+              :disabled="authStore.user?.id === item._id"
+              @click="handleQuickStatusChange(item, 'active')"
             >
-              <ChevronLeft class="nav-icon" /> Prev
+              <ShieldCheck class="action-icon" />
             </button>
             <button
-              class="pagination-btn"
-              :disabled="currentPage === totalPages"
-              @click="handlePageChange(currentPage + 1)"
+              v-else-if="item.status === 'active'"
+              class="action-btn action-restrict"
+              title="Restrict/Block account"
+              :disabled="authStore.user?.id === item._id"
+              @click="handleQuickStatusChange(item, 'blocked')"
             >
-              Next <ChevronRight class="nav-icon" />
+              <ShieldAlert class="action-icon" />
+            </button>
+            <!-- Soft Delete -->
+            <button
+              v-if="item.status !== 'deleted'"
+              class="action-btn action-delete"
+              title="Soft delete"
+              :disabled="authStore.user?.id === item._id"
+              @click="handleQuickStatusChange(item, 'deleted')"
+            >
+              <Trash2 class="action-icon" />
             </button>
           </div>
-        </footer>
-      </div>
+        </template>
+
+        <!-- Dynamic Empty State Override -->
+        <template #empty>
+          <div class="empty-state-container">
+            <Search class="empty-state-icon" />
+            <h4>No Users Found</h4>
+            <p>We couldn't find any accounts matching your search terms or filters.</p>
+            <button class="clear-filters-btn" type="button" @click="clearFilters">Clear Filters</button>
+          </div>
+        </template>
+      </BaseTable>
+
+      <!-- Reusable Pagination controls -->
+      <BasePagination
+        :currentPage="currentPage"
+        :totalPages="totalPages"
+        @change="handlePageChange"
+      />
     </template>
 
     <!-- MODAL: View Details -->
-    <div v-if="showViewModal && activeUser" class="modal-overlay" @click.self="closeModals">
-      <div class="modal-card">
-        <header class="modal-header">
-          <h3>User Profile Detail</h3>
-          <button class="close-modal-btn" @click="closeModals">
-            <X class="close-icon" />
-          </button>
-        </header>
-        <div class="modal-body read-only-grid">
-          <div class="view-group">
-            <span class="view-label">User ID</span>
-            <span class="view-value mono">{{ activeUser._id }}</span>
-          </div>
-          <div class="view-group">
-            <span class="view-label">Full Name</span>
-            <span class="view-value">{{ activeUser.fullName }}</span>
-          </div>
-          <div class="view-group">
-            <span class="view-label">Email Address</span>
-            <span class="view-value">{{ activeUser.email || '—' }}</span>
-          </div>
-          <div class="view-group">
-            <span class="view-label">Phone Number</span>
-            <span class="view-value">{{ activeUser.phone || '—' }}</span>
-          </div>
-          <div class="view-group">
-            <span class="view-label">Role Classification</span>
-            <span class="view-value">
-              <span class="role-badge" :style="{ backgroundColor: roleBadgeColor(activeUser.role) + '15', color: roleBadgeColor(activeUser.role) }">
-                {{ activeUser.role }}
-              </span>
-            </span>
-          </div>
-          <div class="view-group">
-            <span class="view-label">Status Summary</span>
-            <span class="view-value">
-              <span class="status-badge" :style="{ backgroundColor: statusBadgeColor(activeUser.status) + '15', color: statusBadgeColor(activeUser.status) }">
-                {{ activeUser.status }}
-              </span>
-            </span>
-          </div>
-          <div class="view-group">
-            <span class="view-label">Created At</span>
-            <span class="view-value">{{ formatDate(activeUser.createdAt) }}</span>
-          </div>
+    <BaseModal :show="showViewModal" title="User Profile Detail" @close="closeModals">
+      <div v-if="activeUser" class="read-only-grid">
+        <div class="view-group">
+          <span class="view-label">User ID</span>
+          <span class="view-value mono">{{ activeUser._id }}</span>
         </div>
-        <footer class="modal-footer">
-          <button class="secondary-btn" @click="closeModals">Close Summary</button>
-        </footer>
+        <div class="view-group">
+          <span class="view-label">Full Name</span>
+          <span class="view-value">{{ activeUser.fullName }}</span>
+        </div>
+        <div class="view-group">
+          <span class="view-label">Email Address</span>
+          <span class="view-value">{{ activeUser.email || '—' }}</span>
+        </div>
+        <div class="view-group">
+          <span class="view-label">Phone Number</span>
+          <span class="view-value">{{ activeUser.phone || '—' }}</span>
+        </div>
+        <div class="view-group">
+          <span class="view-label">Role Classification</span>
+          <span class="view-value">
+            <span class="role-badge" :style="{ backgroundColor: roleBadgeColor(activeUser.role) + '15', color: roleBadgeColor(activeUser.role) }">
+              {{ activeUser.role }}
+            </span>
+          </span>
+        </div>
+        <div class="view-group">
+          <span class="view-label">Status Summary</span>
+          <span class="view-value">
+            <span class="status-badge" :style="{ backgroundColor: statusBadgeColor(activeUser.status) + '15', color: statusBadgeColor(activeUser.status) }">
+              {{ activeUser.status }}
+            </span>
+          </span>
+        </div>
+        <div class="view-group">
+          <span class="view-label">Created At</span>
+          <span class="view-value">{{ formatDate(activeUser.createdAt) }}</span>
+        </div>
       </div>
-    </div>
+      <template #footer>
+        <button class="secondary-btn" @click="closeModals">Close Summary</button>
+      </template>
+    </BaseModal>
 
     <!-- MODAL: Edit Profile -->
-    <div v-if="showEditModal && activeUser" class="modal-overlay" @click.self="closeModals">
-      <div class="modal-card">
-        <header class="modal-header">
-          <h3>Edit User Account</h3>
-          <button class="close-modal-btn" @click="closeModals">
-            <X class="close-icon" />
-          </button>
-        </header>
-        <form @submit.prevent="submitEditForm">
-          <div class="modal-body form-inputs-wrap">
-            <!-- Full Name -->
-            <div class="input-group">
-              <label for="edit-name">Full Name</label>
-              <input
-                id="edit-name"
-                v-model="editForm.fullName"
-                type="text"
-                required
-                class="form-input"
-              />
-            </div>
-            <!-- Email -->
-            <div class="input-group">
-              <label for="edit-email">Email Address</label>
-              <input
-                id="edit-email"
-                v-model="editForm.email"
-                type="email"
-                class="form-input"
-              />
-            </div>
-            <!-- Phone -->
-            <div class="input-group">
-              <label for="edit-phone">Phone Number</label>
-              <input
-                id="edit-phone"
-                v-model="editForm.phone"
-                type="text"
-                class="form-input"
-              />
-            </div>
-
-            <!-- Lockout Warnings / Controls -->
-            <div v-if="authStore.user?.id === activeUser._id" class="safety-warning-banner">
-              <AlertTriangle class="warn-icon" />
-              <span>You cannot modify your own administrative role or active status.</span>
-            </div>
-
-            <!-- Role Selection -->
-            <div class="input-group">
-              <BaseSelect
-                v-model="editForm.role"
-                :options="roleEditOptions"
-                label="Role Classification"
-                :disabled="authStore.user?.id === activeUser._id"
-              />
-            </div>
-            <!-- Status Selection -->
-            <div class="input-group">
-              <BaseSelect
-                v-model="editForm.status"
-                :options="statusEditOptions"
-                label="Status Summary"
-                :disabled="authStore.user?.id === activeUser._id"
-              />
-            </div>
+    <BaseModal :show="showEditModal" title="Edit User Account" @close="closeModals">
+      <form @submit.prevent="submitEditForm" id="edit-user-form">
+        <div class="form-inputs-wrap">
+          <!-- Full Name -->
+          <div class="input-group">
+            <label for="edit-name">Full Name</label>
+            <input
+              id="edit-name"
+              v-model="editForm.fullName"
+              type="text"
+              required
+              class="form-input"
+            />
           </div>
-          <footer class="modal-footer">
-            <button type="button" class="secondary-btn" @click="closeModals">Cancel</button>
-            <button type="submit" class="primary-btn">Save Changes</button>
-          </footer>
-        </form>
-      </div>
-    </div>
+          <!-- Email -->
+          <div class="input-group">
+            <label for="edit-email">Email Address</label>
+            <input
+              id="edit-email"
+              v-model="editForm.email"
+              type="email"
+              class="form-input"
+            />
+          </div>
+          <!-- Phone -->
+          <div class="input-group">
+            <label for="edit-phone">Phone Number</label>
+            <input
+              id="edit-phone"
+              v-model="editForm.phone"
+              type="text"
+              class="form-input"
+            />
+          </div>
+
+          <!-- Lockout Warnings -->
+          <div v-if="activeUser && authStore.user?.id === activeUser._id" class="safety-warning-banner">
+            <AlertTriangle class="warn-icon" />
+            <span>You cannot modify your own administrative role or active status.</span>
+          </div>
+
+          <!-- Role Selection -->
+          <div class="input-group">
+            <BaseSelect
+              v-model="editForm.role"
+              :options="roleEditOptions"
+              label="Role Classification"
+              :disabled="!!activeUser && authStore.user?.id === activeUser._id"
+            />
+          </div>
+          <!-- Status Selection -->
+          <div class="input-group">
+            <BaseSelect
+              v-model="editForm.status"
+              :options="statusEditOptions"
+              label="Status Summary"
+              :disabled="!!activeUser && authStore.user?.id === activeUser._id"
+            />
+          </div>
+        </div>
+      </form>
+      <template #footer>
+        <button type="button" class="secondary-btn" @click="closeModals">Cancel</button>
+        <button type="submit" form="edit-user-form" class="primary-btn" :disabled="editSaving">
+          <span v-if="editSaving">Saving...</span>
+          <span v-else>Save Changes</span>
+        </button>
+      </template>
+    </BaseModal>
+
+    <!-- Global Confirmation Dialog Overlay -->
+    <BaseConfirmDialog
+      v-model="showConfirmDialog"
+      :title="confirmDialogTitle"
+      :message="confirmDialogMessage"
+      :variant="confirmDialogVariant"
+      :loading="confirmDialogLoading"
+      @confirm="handleConfirmDialogAction"
+      @cancel="handleConfirmDialogCancel"
+    />
   </div>
 </template>
 
@@ -663,48 +701,6 @@ const clearFilters = () => {
   flex-shrink: 0;
 }
 
-/* Users Table Card */
-.table-card {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
-.table-scroll-wrap {
-  overflow-x: auto;
-}
-
-.users-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: var(--font-sans);
-  font-size: 0.85rem;
-  text-align: left;
-}
-
-thead th {
-  padding: 14px 20px;
-  font-weight: 700;
-  color: var(--color-muted);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  border-bottom: 1px solid var(--color-border);
-}
-
-tbody td {
-  padding: 14px 20px;
-  color: var(--color-text);
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
-tbody tr:last-child td {
-  border-bottom: none;
-}
-
 /* Profile Cell */
 .profile-cell-wrap {
   display: flex;
@@ -749,11 +745,6 @@ tbody tr:last-child td {
 
 .date-cell {
   color: var(--color-muted);
-}
-
-.empty-state-cell {
-  text-align: center !important;
-  padding: 64px 24px !important;
 }
 
 .empty-state-container {
@@ -807,15 +798,6 @@ tbody tr:last-child td {
 
 .clear-filters-btn:hover {
   background-color: var(--color-border);
-}
-
-/* Actions Header & Columns */
-.actions-header {
-  text-align: right;
-}
-
-tbody td:last-child {
-  text-align: right;
 }
 
 .actions-buttons-wrap {
@@ -872,56 +854,6 @@ tbody td:last-child {
   height: 14px;
 }
 
-/* Pagination Footer */
-.pagination-footer {
-  padding: 16px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-top: 1px solid var(--color-border);
-  box-sizing: border-box;
-}
-
-.pagination-summary {
-  font-size: 0.8rem;
-  color: var(--color-muted);
-}
-
-.pagination-navigation {
-  display: flex;
-  gap: 8px;
-}
-
-.pagination-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background-color: var(--color-surface);
-  color: var(--color-text);
-  font-family: var(--font-sans);
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.pagination-btn:hover:not(:disabled) {
-  background-color: var(--color-bg-alt);
-}
-
-.pagination-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.pagination-btn .nav-icon {
-  width: 14px;
-  height: 14px;
-}
-
 /* Error Boundary */
 .error-boundary {
   text-align: center;
@@ -967,82 +899,6 @@ tbody td:last-child {
 
 .retry-btn:hover {
   opacity: 0.9;
-}
-
-.retry-icon {
-  width: 16px;
-  height: 16px;
-}
-
-/* Modal Overlay */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: rgba(15, 20, 32, 0.6);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1100;
-}
-
-.modal-card {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 500px;
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.modal-header {
-  height: 64px;
-  padding: 0 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--color-border);
-  box-sizing: border-box;
-}
-
-.modal-header h3 {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: var(--color-text);
-  margin: 0;
-}
-
-.close-modal-btn {
-  background: none;
-  border: none;
-  color: var(--color-muted);
-  cursor: pointer;
-  padding: 6px;
-  border-radius: var(--radius-md);
-}
-
-.close-modal-btn:hover {
-  background-color: var(--color-bg-alt);
-  color: var(--color-text);
-}
-
-.close-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.modal-body {
-  padding: 24px;
-  max-height: 70vh;
-  overflow-y: auto;
-  box-sizing: border-box;
 }
 
 /* Detail view layout */
@@ -1116,10 +972,6 @@ tbody td:last-child {
   border-color: var(--color-accent);
 }
 
-.select-input {
-  cursor: pointer;
-}
-
 .form-input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -1147,18 +999,6 @@ tbody td:last-child {
   flex-shrink: 0;
 }
 
-/* Modal Footer */
-.modal-footer {
-  height: 64px;
-  padding: 0 24px;
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 12px;
-  border-top: 1px solid var(--color-border);
-  box-sizing: border-box;
-}
-
 .primary-btn,
 .secondary-btn {
   padding: 10px 18px;
@@ -1177,8 +1017,13 @@ tbody td:last-child {
   border: none;
 }
 
-.primary-btn:hover {
+.primary-btn:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .secondary-btn {
@@ -1189,26 +1034,6 @@ tbody td:last-child {
 
 .secondary-btn:hover {
   background-color: var(--color-bg-alt);
-}
-
-/* Shimmer Loading skeletons */
-.skeleton-container {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.skeleton-row {
-  height: 52px;
-  background: linear-gradient(90deg, var(--color-border) 25%, var(--color-bg-alt) 50%, var(--color-border) 75%);
-  background-size: 200% 100%;
-  border-radius: var(--radius-md);
-  animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
 }
 
 /* Feedback toasts */
