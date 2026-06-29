@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { cartApi } from '../api/cart.api.js';
-import type { CartData, CartTotals, CartItem, ShippingAddress, OrderData } from '../api/cart.api.js';
+import type { CartData, CartTotals, ShippingAddress, OrderData } from '../api/cart.api.js';
 import { useToastStore } from './toast.store.js';
 
 export const useCartStore = defineStore('cart', () => {

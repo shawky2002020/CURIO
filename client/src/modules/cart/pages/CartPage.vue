@@ -3,7 +3,7 @@ import { onMounted, ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useCartStore } from '../../../stores/cart.store.js';
 import BaseButton from '../../../components/ui/BaseButton.vue';
-import { Trash2, Plus, Minus, Tag, ArrowRight, ShoppingBag, Sparkles } from '@lucide/vue';
+import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, Sparkles } from '@lucide/vue';
 
 const router = useRouter();
 const cartStore = useCartStore();

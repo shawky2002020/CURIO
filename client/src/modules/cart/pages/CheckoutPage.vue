@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useCartStore } from '../../../stores/cart.store.js';
 import { useAuthStore } from '../../../stores/auth.store.js';
