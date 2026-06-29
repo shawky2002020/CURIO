@@ -5,8 +5,9 @@ export class CategoryService {
   /**
    * Returns all categories.
    */
-  public async getAll(): Promise<ICategory[]> {
-    return Category.find().sort({ name: 1 });
+  public async getAll(includeDeleted = false): Promise<ICategory[]> {
+    const query = includeDeleted ? {} : { status: { $ne: 'deleted' } };
+    return Category.find(query).sort({ name: 1 });
   }
 
   /**
@@ -70,13 +71,28 @@ export class CategoryService {
   }
 
   /**
-   * Deletes a category by ID.
+   * Deletes a category by ID (Soft Delete).
    */
   public async delete(id: string): Promise<void> {
-    const category = await Category.findByIdAndDelete(id);
+    const category = await Category.findById(id);
     if (!category) {
       throw new ApiError(404, 'Category not found.', 'NOT_FOUND');
     }
+    category.status = 'deleted';
+    await category.save();
+  }
+
+  /**
+   * Restores a soft-deleted category by ID.
+   */
+  public async restore(id: string): Promise<ICategory> {
+    const category = await Category.findById(id);
+    if (!category) {
+      throw new ApiError(404, 'Category not found.', 'NOT_FOUND');
+    }
+    category.status = 'active';
+    await category.save();
+    return category;
   }
 }
 

@@ -27,5 +27,6 @@ router.put(
   productController.updateCategory
 );
 router.delete('/:id', auth, role('admin'), productController.deleteCategory);
+router.post('/:id/restore', auth, role('admin'), productController.restoreCategory);
 
 export default router;

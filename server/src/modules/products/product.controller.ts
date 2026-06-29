@@ -7,8 +7,9 @@ import { reviewService } from './review.service.js';
 export class ProductController {
   // ─── Categories ───────────────────────────────────────────────────────────
 
-  public getAllCategories = asyncHandler(async (_req: Request, res: Response) => {
-    const categories = await categoryService.getAll();
+  public getAllCategories = asyncHandler(async (req: Request, res: Response) => {
+    const includeDeleted = req.query.includeDeleted === 'true';
+    const categories = await categoryService.getAll(includeDeleted);
     res.status(200).json({ success: true, message: 'Categories retrieved.', data: categories });
   });
 
@@ -32,15 +33,23 @@ export class ProductController {
     res.status(200).json({ success: true, message: 'Category deleted.' });
   });
 
+  public restoreCategory = asyncHandler(async (req: Request, res: Response) => {
+    const category = await categoryService.restore(req.params.id);
+    res.status(200).json({ success: true, message: 'Category restored.', data: category });
+  });
+
   // ─── Products ─────────────────────────────────────────────────────────────
 
   public getAllProducts = asyncHandler(async (req: Request, res: Response) => {
-    const { search, categoryId, minPrice, maxPrice } = req.query;
+    const { search, categoryId, minPrice, maxPrice, seller, stockStatus, status } = req.query;
     const products = await productService.getAll({
       search: search as string,
       categoryId: categoryId as string,
       minPrice: minPrice ? Number(minPrice) : undefined,
       maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      seller: seller as string,
+      stockStatus: stockStatus as any,
+      status: status as string,
     });
     res.status(200).json({ success: true, message: 'Products retrieved.', data: products });
   });

@@ -5,6 +5,7 @@ export interface ICategory extends Document {
   slug: string;
   description?: string;
   imageUrl?: string;
+  status: 'active' | 'deleted';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,6 +30,11 @@ const categorySchema = new Schema<ICategory>(
     },
     imageUrl: {
       type: String,
+    },
+    status: {
+      type: String,
+      enum: ['active', 'deleted'],
+      default: 'active',
     },
   },
   {
