@@ -43,30 +43,6 @@ const routes: RouteRecordRaw[] = [
         beforeEnter: authGuard,
       },
       {
-        path: 'admin/dashboard',
-        name: 'admin-dashboard',
-        component: () => import('../modules/admin/pages/AdminDashboardPage.vue'),
-        beforeEnter: roleGuard(['admin']),
-      },
-      {
-        path: 'seller/dashboard',
-        name: 'seller-dashboard',
-        component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
-        beforeEnter: roleGuard(['seller']),
-      },
-      {
-        path: 'admin/products',
-        name: 'admin-products',
-        component: () => import('../modules/admin/pages/AdminProductsPage.vue'),
-        beforeEnter: roleGuard(['admin', 'seller']),
-      },
-      {
-        path: 'admin/categories',
-        name: 'admin-categories',
-        component: () => import('../modules/admin/pages/AdminCategoriesPage.vue'),
-        beforeEnter: roleGuard(['admin']),
-      },
-      {
         path: 'cart',
         name: 'cart',
         component: () => import('../modules/cart/pages/CartPage.vue'),
@@ -85,6 +61,63 @@ const routes: RouteRecordRaw[] = [
         path: 'forbidden',
         name: 'forbidden',
         component: { template: '<div>Access Forbidden - 403</div>' } as any,
+      },
+    ],
+  },
+  {
+    path: '/admin',
+    component: () => import('../layouts/AdminLayout.vue'),
+    beforeEnter: roleGuard(['admin', 'seller']),
+    children: [
+      {
+        path: 'dashboard',
+        name: 'admin-dashboard',
+        component: () => import('../modules/admin/pages/AdminDashboardPage.vue'),
+        beforeEnter: roleGuard(['admin']),
+      },
+      {
+        path: 'categories',
+        name: 'admin-categories',
+        component: () => import('../modules/admin/pages/AdminCategoriesPage.vue'),
+        beforeEnter: roleGuard(['admin']),
+      },
+      {
+        path: 'products',
+        name: 'admin-products',
+        component: () => import('../modules/admin/pages/AdminProductsPage.vue'),
+        beforeEnter: roleGuard(['admin', 'seller']),
+      },
+    ],
+  },
+  {
+    path: '/seller',
+    component: () => import('../layouts/SellerLayout.vue'),
+    beforeEnter: roleGuard(['seller']),
+    children: [
+      {
+        path: 'dashboard',
+        name: 'seller-dashboard',
+        component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
+      },
+      {
+        path: 'inventory',
+        name: 'seller-inventory',
+        component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
+      },
+      {
+        path: 'orders',
+        name: 'seller-orders',
+        component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
+      },
+      {
+        path: 'reviews',
+        name: 'seller-reviews',
+        component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
+      },
+      {
+        path: 'profile',
+        name: 'seller-profile',
+        component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
       },
     ],
   },
