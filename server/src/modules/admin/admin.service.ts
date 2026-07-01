@@ -390,6 +390,7 @@ class AdminService {
           _id: 1,
           rating: 1,
           comment: 1,
+          sellerReply: 1,
           status: 1,
           createdAt: 1,
           user: { _id: '$user._id', fullName: '$user.fullName', email: '$user.email' },

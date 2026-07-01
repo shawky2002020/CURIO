@@ -51,6 +51,7 @@ export interface Review {
   };
   rating: number;
   comment: string;
+  sellerReply?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -152,6 +152,7 @@ export interface ReviewRegistryItem {
   _id: string;
   rating: number;
   comment: string;
+  sellerReply?: string;
   status: 'active' | 'hidden';
   createdAt: string;
   user: {

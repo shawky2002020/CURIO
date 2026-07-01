@@ -5,6 +5,7 @@ export interface IReview extends Document {
   userId: Types.ObjectId;
   rating: number;
   comment: string;
+  sellerReply?: string;
   status: 'active' | 'hidden';
   createdAt: Date;
   updatedAt: Date;
@@ -32,6 +33,11 @@ const reviewSchema = new Schema<IReview>(
       type: String,
       required: true,
       trim: true,
+    },
+    sellerReply: {
+      type: String,
+      trim: true,
+      default: '',
     },
     status: {
       type: String,
