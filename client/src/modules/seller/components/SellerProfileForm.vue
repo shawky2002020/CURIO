@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { useUserStore } from '../../../stores/user.store.js';
 import BaseInput from '../../../components/ui/BaseInput.vue';
 import BaseButton from '../../../components/ui/BaseButton.vue';
@@ -13,6 +13,9 @@ const emit = defineEmits<{
 
 const userStore = useUserStore();
 
+const fullName = ref('');
+const email = ref('');
+const phone = ref('');
 const storeName = ref('');
 const storeDescription = ref('');
 const storePhone = ref('');
@@ -24,6 +27,8 @@ const country = ref('');
 const postalCode = ref('');
 
 const errors = ref({
+  fullName: '',
+  phone: '',
   storeName: '',
   storePhone: '',
   street: '',
@@ -42,26 +47,37 @@ onMounted(async () => {
       console.error(err);
     }
   }
-
-  if (userStore.profile) {
-    storeName.value = userStore.profile.storeName || '';
-    storeDescription.value = userStore.profile.storeDescription || '';
-    storePhone.value = userStore.profile.storePhone || '';
-    storeLogoUrl.value = userStore.profile.storeLogoUrl || '';
-    if (userStore.profile.storeAddress) {
-      street.value = userStore.profile.storeAddress.street || '';
-      city.value = userStore.profile.storeAddress.city || '';
-      state.value = userStore.profile.storeAddress.state || '';
-      country.value = userStore.profile.storeAddress.country || '';
-      postalCode.value = userStore.profile.storeAddress.postalCode || '';
-    }
-  }
 });
+
+watch(
+  () => userStore.profile,
+  (newProfile) => {
+    if (newProfile) {
+      fullName.value = newProfile.fullName || '';
+      email.value = newProfile.email || '';
+      phone.value = newProfile.phone || '';
+      storeName.value = newProfile.storeName || '';
+      storeDescription.value = newProfile.storeDescription || '';
+      storePhone.value = newProfile.storePhone || '';
+      storeLogoUrl.value = newProfile.storeLogoUrl || '';
+      if (newProfile.storeAddress) {
+        street.value = newProfile.storeAddress.street || '';
+        city.value = newProfile.storeAddress.city || '';
+        state.value = newProfile.storeAddress.state || '';
+        country.value = newProfile.storeAddress.country || '';
+        postalCode.value = newProfile.storeAddress.postalCode || '';
+      }
+    }
+  },
+  { immediate: true, deep: true }
+);
 
 const validateForm = (): boolean => {
   let isValid = true;
   
   errors.value = {
+    fullName: '',
+    phone: '',
     storeName: '',
     storePhone: '',
     street: '',
@@ -69,6 +85,14 @@ const validateForm = (): boolean => {
     country: '',
     postalCode: '',
   };
+
+  if (!fullName.value.trim()) {
+    errors.value.fullName = 'Full name is required.';
+    isValid = false;
+  } else if (fullName.value.trim().length < 2) {
+    errors.value.fullName = 'Full name must be at least 2 characters.';
+    isValid = false;
+  }
 
   if (!storeName.value.trim()) {
     errors.value.storeName = 'Store name is required.';
@@ -117,6 +141,8 @@ const handleSaveSubmit = async () => {
   try {
     showSuccessAlert.value = false;
     await userStore.updateProfile({
+      fullName: fullName.value.trim(),
+      phone: phone.value.trim() || undefined,
       storeName: storeName.value.trim(),
       storeDescription: storeDescription.value.trim(),
       storePhone: storePhone.value.trim() || undefined,
@@ -151,6 +177,40 @@ const handleSaveSubmit = async () => {
 
     <form @submit.prevent="handleSaveSubmit" novalidate class="form-layout">
       
+      <!-- Account Owner Details -->
+      <div class="form-section">
+        <h3 class="section-title">Account Owner Details</h3>
+        
+        <div class="address-grid">
+          <BaseInput
+            id="user-fullname"
+            v-model="fullName"
+            type="text"
+            label="Full Name"
+            placeholder="e.g. Leonardo da Vinci"
+            :error="errors.fullName"
+            required
+          />
+
+          <BaseInput
+            id="user-email"
+            v-model="email"
+            type="email"
+            label="Email Address (Read-only)"
+            disabled
+          />
+        </div>
+
+        <BaseInput
+          id="user-phone"
+          v-model="phone"
+          type="tel"
+          label="Account Contact Phone"
+          placeholder="e.g. +1 (555) 123-4567"
+          :error="errors.phone"
+        />
+      </div>
+
       <!-- Identity Section -->
       <div class="form-section">
         <h3 class="section-title">Store Identity</h3>
