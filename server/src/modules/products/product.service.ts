@@ -72,7 +72,7 @@ export class ProductService {
 
     const products = await Product.find(query)
       .populate('categoryId', 'name slug imageUrl')
-      .populate('seller', 'fullName avatarUrl')
+      .populate('seller', 'fullName avatarUrl storeName storeDescription storeLogoUrl')
       .sort({ createdAt: -1 });
 
     return products.map(product => {
@@ -100,7 +100,7 @@ export class ProductService {
   public async getById(id: string): Promise<IProduct> {
     const product = await Product.findById(id)
       .populate('categoryId', 'name slug imageUrl')
-      .populate('seller', 'fullName avatarUrl');
+      .populate('seller', 'fullName avatarUrl storeName storeDescription storeLogoUrl');
     if (!product || product.deletedAt !== null) {
       throw new ApiError(404, 'Product not found.', 'NOT_FOUND');
     }
@@ -152,7 +152,7 @@ export class ProductService {
 
     const populated = await product.populate([
       { path: 'categoryId', select: 'name slug imageUrl' },
-      { path: 'seller', select: 'fullName avatarUrl email role' }
+      { path: 'seller', select: 'fullName avatarUrl email role storeName storeDescription storeLogoUrl' }
     ]);
 
     const setting = await Setting.findOne({ key: 'lowStockThreshold' });
@@ -228,7 +228,7 @@ export class ProductService {
     
     const populated = await product.populate([
       { path: 'categoryId', select: 'name slug imageUrl' },
-      { path: 'seller', select: 'fullName avatarUrl email role' }
+      { path: 'seller', select: 'fullName avatarUrl email role storeName storeDescription storeLogoUrl' }
     ]);
 
     const setting = await Setting.findOne({ key: 'lowStockThreshold' });

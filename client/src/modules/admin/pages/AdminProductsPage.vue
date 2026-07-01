@@ -75,7 +75,7 @@ const categoryOptions = computed(() => {
 const sellerOptions = computed(() => {
   const opts = [{ label: 'All Sellers', value: '' }];
   sellersList.value.forEach((sel) => {
-    opts.push({ label: sel.fullName, value: sel._id });
+    opts.push({ label: sel.storeName || sel.fullName, value: sel._id });
   });
   return opts;
 });
@@ -545,7 +545,7 @@ const statusLabel: Record<string, string> = {
 
       <!-- Cell: Seller (Admin Only) -->
       <template #cell(seller)="{ item }">
-        <span class="seller-name-cell">{{ item.seller?.fullName || '—' }}</span>
+        <span class="seller-name-cell">{{ item.seller?.storeName || item.seller?.fullName || '—' }}</span>
       </template>
 
       <!-- Cell: Category -->
