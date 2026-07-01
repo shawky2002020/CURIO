@@ -142,24 +142,29 @@ const routes: RouteRecordRaw[] = [
         component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
       },
       {
+        path: 'products',
+        name: 'seller-products',
+        component: () => import('../modules/seller/pages/SellerProductsPage.vue'),
+      },
+      {
         path: 'inventory',
         name: 'seller-inventory',
-        component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
+        component: () => import('../modules/seller/pages/SellerInventoryPage.vue'),
       },
       {
         path: 'orders',
         name: 'seller-orders',
-        component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
+        component: () => import('../modules/seller/pages/SellerOrdersPage.vue'),
       },
       {
         path: 'reviews',
         name: 'seller-reviews',
-        component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
+        component: () => import('../modules/seller/pages/SellerReviewsPage.vue'),
       },
       {
         path: 'profile',
         name: 'seller-profile',
-        component: () => import('../modules/seller/pages/SellerDashboardPage.vue'),
+        component: () => import('../modules/seller/pages/SellerProfilePage.vue'),
       },
     ],
   },

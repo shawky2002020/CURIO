@@ -259,7 +259,13 @@ const clearSearch = () => {
 
         <!-- Cell: Comment -->
         <template #cell(comment)="{ item }">
-          <span class="comment-text-box" :title="item.comment">{{ item.comment }}</span>
+          <div class="comment-cell-wrap">
+            <span class="comment-text-box" :title="item.comment">{{ item.comment }}</span>
+            <div v-if="item.sellerReply" class="admin-reply-preview">
+              <span class="reply-badge-label">Seller Response:</span>
+              <p class="reply-preview-text">"{{ item.sellerReply }}"</p>
+            </div>
+          </div>
         </template>
 
         <!-- Cell: Status -->
@@ -643,5 +649,39 @@ const clearSearch = () => {
 
 .retry-btn:hover {
   opacity: 0.9;
+}
+
+.comment-cell-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.admin-reply-preview {
+  background-color: var(--color-bg-alt);
+  border-left: 2px solid var(--color-primary);
+  padding: 6px 10px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  max-width: 400px;
+}
+
+.reply-badge-label {
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: block;
+}
+
+.reply-preview-text {
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--color-text);
+  margin: 2px 0 0 0;
+  font-style: italic;
 }
 </style>

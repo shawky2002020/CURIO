@@ -17,15 +17,24 @@ export interface Product {
   slug: string;
   description: string;
   price: number;
+  discount?: number;
+  effectivePrice?: number;
   stock: number;
+  stockStatus?: 'in' | 'low' | 'out';
   categoryId: Category;
   images: string[];
   seller: {
     _id: string;
     fullName: string;
     avatarUrl?: string;
+    storeName?: string;
+    storeDescription?: string;
+    storeLogoUrl?: string;
+    storePhone?: string;
   };
   status: ProductStatus;
+  deletedAt?: string | null;
+  archivedByAdmin?: boolean;
   averageRating: number;
   reviewCount: number;
   createdAt: string;
@@ -42,6 +51,7 @@ export interface Review {
   };
   rating: number;
   comment: string;
+  sellerReply?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +64,22 @@ export interface ProductFilters {
   seller?: string;
   stockStatus?: 'in' | 'out' | 'low' | 'all';
   status?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedProductsResponse {
+  products: Product[];
+  total: number;
+  pages: number;
+  page: number;
+  limit: number;
+  stats: {
+    total: number;
+    active: number;
+    draft: number;
+    archived: number;
+  };
 }
 
 export interface CreateProductPayload {
@@ -64,6 +90,7 @@ export interface CreateProductPayload {
   categoryId: string;
   images?: string[];
   status?: ProductStatus;
+  discount?: number;
 }
 
 export interface CreateCategoryPayload {

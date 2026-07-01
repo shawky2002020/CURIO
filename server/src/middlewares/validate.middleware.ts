@@ -12,7 +12,23 @@ export const validate = (schema: { body?: Record<string, string>; query?: Record
     // Validate request body if schema provides it
     if (schema.body) {
       for (const [key, rules] of Object.entries(schema.body)) {
-        const value = req.body[key];
+        // Resolve nested path values (e.g. storeAddress.street)
+        let parentValue: any = req.body;
+        const parts = key.split('.');
+        for (let i = 0; i < parts.length - 1; i++) {
+          parentValue = parentValue ? parentValue[parts[i]] : undefined;
+        }
+
+        // If parent object is missing (e.g., optional parent is not provided), skip validation
+        if (parts.length > 1 && (parentValue === undefined || parentValue === null)) {
+          continue;
+        }
+
+        let value: any = req.body;
+        for (const part of parts) {
+          value = value ? value[part] : undefined;
+        }
+
         const ruleList = rules.split('|');
 
         const isRequired = ruleList.includes('required');
@@ -27,6 +43,7 @@ export const validate = (schema: { body?: Record<string, string>; query?: Record
         if (isOptional && (value === undefined || value === null || value === '')) {
           continue;
         }
+
 
         // Run validation assertions
         for (const rule of ruleList) {

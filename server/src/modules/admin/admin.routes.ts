@@ -27,4 +27,8 @@ router.delete('/banners/:id', bannerController.deleteBanner);
 router.get('/settings', adminController.getSettings);
 router.patch('/settings', adminController.updateSettings);
 
+// Admin Product Moderation
+router.get('/products', adminController.getProducts);
+router.patch('/products/:id/archive', adminController.archiveProduct);
+
 export default router;

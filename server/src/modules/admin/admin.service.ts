@@ -212,7 +212,7 @@ class AdminService {
       ];
     }
 
-    const [users, total] = await Promise.all([
+    const [users, total, totalCustomers, activeCustomers, totalSellers, activeSellers] = await Promise.all([
       User.find(filter)
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
@@ -220,6 +220,10 @@ class AdminService {
         .select('-passwordHash')
         .lean(),
       User.countDocuments(filter),
+      User.countDocuments({ role: 'customer', status: { $ne: 'deleted' } }),
+      User.countDocuments({ role: 'customer', status: 'active' }),
+      User.countDocuments({ role: 'seller', status: { $ne: 'deleted' } }),
+      User.countDocuments({ role: 'seller', status: 'active' }),
     ]);
 
     return {
@@ -227,6 +231,12 @@ class AdminService {
       total,
       pages: Math.ceil(total / limit),
       page,
+      stats: {
+        totalCustomers,
+        activeCustomers,
+        totalSellers,
+        activeSellers,
+      },
     };
   }
 
@@ -390,6 +400,7 @@ class AdminService {
           _id: 1,
           rating: 1,
           comment: 1,
+          sellerReply: 1,
           status: 1,
           createdAt: 1,
           user: { _id: '$user._id', fullName: '$user.fullName', email: '$user.email' },
@@ -610,6 +621,7 @@ class AdminService {
       freeShippingThreshold: map.freeShippingThreshold !== undefined ? map.freeShippingThreshold : 100,
       shippingCost: map.shippingCost !== undefined ? map.shippingCost : 10,
       contactEmail: map.contactEmail !== undefined ? map.contactEmail : 'support@curio.com',
+      lowStockThreshold: map.lowStockThreshold !== undefined ? map.lowStockThreshold : 5,
     };
   }
 
@@ -617,13 +629,19 @@ class AdminService {
    * Update settings fields in bulk.
    */
   public async updateSettings(payload: Record<string, any>) {
-    const keys = ['taxRate', 'freeShippingThreshold', 'shippingCost', 'contactEmail'];
+    const keys = ['taxRate', 'freeShippingThreshold', 'shippingCost', 'contactEmail', 'lowStockThreshold'];
     for (const key of keys) {
       if (payload[key] !== undefined) {
         let val = payload[key];
         if (key === 'taxRate' || key === 'freeShippingThreshold' || key === 'shippingCost') {
           val = Number(val);
           if (isNaN(val) || val < 0) continue;
+        }
+        if (key === 'lowStockThreshold') {
+          val = Number(val);
+          if (isNaN(val) || !Number.isInteger(val) || val < 1) {
+            throw new ApiError(400, 'Low stock threshold must be a positive integer greater than or equal to 1.', 'VALIDATION_ERROR');
+          }
         }
         await Setting.findOneAndUpdate(
           { key },

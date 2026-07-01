@@ -41,7 +41,7 @@ export class ProductController {
   // ─── Products ─────────────────────────────────────────────────────────────
 
   public getAllProducts = asyncHandler(async (req: Request, res: Response) => {
-    const { search, categoryId, minPrice, maxPrice, seller, stockStatus, status } = req.query;
+    const { search, categoryId, minPrice, maxPrice, seller, stockStatus, status, page, limit } = req.query;
     const products = await productService.getAll({
       search: search as string,
       categoryId: categoryId as string,
@@ -50,6 +50,8 @@ export class ProductController {
       seller: seller as string,
       stockStatus: stockStatus as any,
       status: status as string,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
     });
     res.status(200).json({ success: true, message: 'Products retrieved.', data: products });
   });

@@ -13,7 +13,7 @@ import { useToastStore } from '../../../stores/toast.store.js';
 import { useAuthStore } from '../../../stores/auth.store.js';
 import { adminApi } from '../../../api/admin.api.js';
 import type { CreateProductPayload } from '../../../types/product.types.js';
-import { Plus, Pencil, Trash2, Package, Eye, ShieldAlert, RotateCcw, SlidersHorizontal } from '@lucide/vue';
+import { Plus, Pencil, Trash2, Package, Eye, ShieldAlert, RotateCcw, SlidersHorizontal, Archive } from '@lucide/vue';
 
 // UI Base Components
 import BaseButton from '../../../components/ui/BaseButton.vue';
@@ -21,6 +21,7 @@ import BaseTable from '../../../components/ui/BaseTable.vue';
 import BaseModal from '../../../components/ui/BaseModal.vue';
 import BaseConfirmDialog from '../../../components/ui/BaseConfirmDialog.vue';
 import BaseSelect from '../../../components/ui/BaseSelect.vue';
+import BasePagination from '../../../components/ui/BasePagination.vue';
 
 const productStore = useProductStore();
 const categoryStore = useCategoryStore();
@@ -75,7 +76,7 @@ const categoryOptions = computed(() => {
 const sellerOptions = computed(() => {
   const opts = [{ label: 'All Sellers', value: '' }];
   sellersList.value.forEach((sel) => {
-    opts.push({ label: sel.fullName, value: sel._id });
+    opts.push({ label: sel.storeName || sel.fullName, value: sel._id });
   });
   return opts;
 });
@@ -142,6 +143,11 @@ const applyFilters = async () => {
   await productStore.fetchProducts(activeFilters);
 };
 
+const handlePageChange = async (newPage: number) => {
+  productStore.pagination.page = newPage;
+  await applyFilters();
+};
+
 // Reset Filters
 const resetFilters = () => {
   filters.value = {
@@ -166,6 +172,7 @@ watch(
     filters.value.status,
   ],
   () => {
+    productStore.pagination.page = 1;
     applyFilters();
   }
 );
@@ -175,6 +182,7 @@ watch(
   () => {
     if (filterTimeout) clearTimeout(filterTimeout);
     filterTimeout = setTimeout(() => {
+      productStore.pagination.page = 1;
       applyFilters();
     }, 400);
   }
@@ -373,6 +381,25 @@ const handleRestoreProduct = (product: any) => {
   );
 };
 
+// "Force Archive" moderation action
+const handleForceArchiveProduct = (product: any) => {
+  openConfirm(
+    'Force Archive Product',
+    `Are you sure you want to force archive "${product.name}"? This moderation action will hide it from the buyer catalog and label it as archived.`,
+    'danger',
+    async () => {
+      try {
+        await adminApi.archiveProduct(product._id);
+        toastStore.success('Product force-archived successfully.');
+        applyFilters();
+      } catch (err: any) {
+        toastStore.error(err.response?.data?.message || 'Failed to force archive product.');
+        throw err;
+      }
+    }
+  );
+};
+
 const statusLabel: Record<string, string> = {
   active: 'Active',
   draft: 'Draft',
@@ -384,26 +411,45 @@ const statusLabel: Record<string, string> = {
   <div class="admin-products-page">
     <!-- Header -->
     <header class="page-header">
-      <div class="header-row">
-        <div>
-          <span class="page-eyebrow">ADMIN STUDIO</span>
-          <h1 class="page-title">Product Management</h1>
-        </div>
-        <div class="header-actions">
-          <BaseButton
-            v-if="authStore.user?.role === 'admin'"
-            variant="secondary"
-            @click="router.push({ name: 'admin-categories' })"
-            id="go-categories-btn"
-          >
-            Manage Categories
-          </BaseButton>
-          <BaseButton variant="primary" @click="openCreate" id="add-product-btn">
-            <Plus class="btn-icon" /> New Product
-          </BaseButton>
-        </div>
+      <div class="title-wrap">
+        <h1 class="page-title">Manage Products</h1>
+        <p class="page-subtitle">Add, publish, and moderate items across categories and sellers.</p>
+      </div>
+
+      <div class="header-actions">
+        <BaseButton
+          v-if="authStore.user?.role === 'admin'"
+          variant="secondary"
+          @click="router.push({ name: 'admin-categories' })"
+          id="go-categories-btn"
+        >
+          Manage Categories
+        </BaseButton>
+        <BaseButton variant="primary" @click="openCreate" id="add-product-btn">
+          <Plus class="btn-icon" /> New Product
+        </BaseButton>
       </div>
     </header>
+
+    <!-- Statistics Insights Cards -->
+    <section class="insights-stats-row" v-if="productStore.stats.total > 0">
+      <div class="stat-card">
+        <span class="stat-card-label">Total Products</span>
+        <strong class="stat-card-value">{{ productStore.stats.total }}</strong>
+      </div>
+      <div class="stat-card stat-card--active">
+        <span class="stat-card-label">Active</span>
+        <strong class="stat-card-value">{{ productStore.stats.active }}</strong>
+      </div>
+      <div class="stat-card stat-card--draft">
+        <span class="stat-card-label">Draft / Hidden</span>
+        <strong class="stat-card-value">{{ productStore.stats.draft }}</strong>
+      </div>
+      <div class="stat-card stat-card--archived">
+        <span class="stat-card-label">Archived / Moderated</span>
+        <strong class="stat-card-value">{{ productStore.stats.archived }}</strong>
+      </div>
+    </section>
 
     <!-- Filters Panel Toolbar -->
     <section class="filters-toolbar-card">
@@ -526,7 +572,7 @@ const statusLabel: Record<string, string> = {
 
       <!-- Cell: Seller (Admin Only) -->
       <template #cell(seller)="{ item }">
-        <span class="seller-name-cell">{{ item.seller?.fullName || '—' }}</span>
+        <span class="seller-name-cell">{{ item.seller?.storeName || item.seller?.fullName || '—' }}</span>
       </template>
 
       <!-- Cell: Category -->
@@ -594,11 +640,21 @@ const statusLabel: Record<string, string> = {
             <RotateCcw class="action-icon" />
           </button>
 
+          <!-- Force Archive (Admin Moderation) -->
+          <button
+            v-if="authStore.user?.role === 'admin' && item.status !== 'archived'"
+            class="action-btn hide-btn"
+            @click="handleForceArchiveProduct(item)"
+            title="Force Archive (Admin)"
+          >
+            <Archive class="action-icon" />
+          </button>
+
           <button
             class="action-btn delete-btn"
             @click="handleDeleteProduct(item)"
             :aria-label="`Delete ${item.name}`"
-            title="Delete product permanently"
+            title="Delete product listing"
           >
             <Trash2 class="action-icon" />
           </button>
@@ -614,6 +670,15 @@ const statusLabel: Record<string, string> = {
         </div>
       </template>
     </BaseTable>
+
+    <!-- Pagination controls -->
+    <div class="products-pagination-wrap" v-if="productStore.pagination.pages > 1">
+      <BasePagination
+        :currentPage="productStore.pagination.page"
+        :totalPages="productStore.pagination.pages"
+        @change="handlePageChange"
+      />
+    </div>
 
     <!-- Create / Edit Product Modal -->
     <BaseModal :show="showModal" :title="modalTitle" size="lg" @close="closeModal">
@@ -1188,5 +1253,62 @@ const statusLabel: Record<string, string> = {
   .double-inputs {
     grid-column: span 1;
   }
+}
+
+/* Statistics Insights cards banner */
+.insights-stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.01);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.03);
+}
+
+.stat-card-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.stat-card-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-text-h);
+}
+
+.stat-card--active {
+  border-left: 4px solid #059669;
+}
+.stat-card--draft {
+  border-left: 4px solid #d97706;
+}
+.stat-card--archived {
+  border-left: 4px solid #dc2626;
+}
+
+.products-pagination-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
 }
 </style>

@@ -5,6 +5,7 @@ export const createProductSchema = {
     price: 'required',
     stock: 'required',
     categoryId: 'required',
+    discount: 'optional',
   },
 };
 
@@ -16,8 +17,16 @@ export const updateProductSchema = {
     stock: 'optional',
     categoryId: 'optional',
     status: 'optional|enum:active,draft,archived',
+    discount: 'optional',
   },
 };
+
+export const updateStockSchema = {
+  body: {
+    stock: 'required',
+  },
+};
+
 
 export const createCategorySchema = {
   body: {

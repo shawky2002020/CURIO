@@ -1,4 +1,5 @@
 import { http } from './http.js';
+import type { ApiResponse } from '../types/api.types.js';
 
 export interface CartItem {
   _id: string;
@@ -165,8 +166,8 @@ export const cartApi = {
     return response.data;
   },
 
-  getMyOrders: async (): Promise<OrdersHistoryApiResponse> => {
-    const response = await http.get('/orders');
+  getMyOrders: async (params?: { page?: number; limit?: number; search?: string; status?: string }): Promise<ApiResponse<any>> => {
+    const response = await http.get<ApiResponse<any>>('/orders', { params });
     return response.data;
   },
 

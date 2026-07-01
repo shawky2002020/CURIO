@@ -59,6 +59,23 @@ export const useUserStore = defineStore('user', () => {
     }
   };
 
+  const uploadLogo = async (file: File): Promise<string> => {
+    loading.value = true;
+    error.value = null;
+    try {
+      const response = await userApi.uploadLogo(file);
+      if (response.success && response.data) {
+        return response.data.logoUrl;
+      }
+      throw new Error(response.message || 'Failed to upload logo');
+    } catch (err: any) {
+      error.value = err.response?.data?.message || err.message || 'Failed to upload logo';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
+  };
+
   return {
     profile,
     loading,
@@ -66,6 +83,8 @@ export const useUserStore = defineStore('user', () => {
     fetchProfile,
     updateProfile,
     uploadAvatar,
+    uploadLogo,
   };
 });
 export default useUserStore;
+

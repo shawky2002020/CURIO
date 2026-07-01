@@ -78,7 +78,19 @@ export class OrderController {
       throw new ApiError(401, 'Authentication required to fetch order history.', 'UNAUTHORIZED');
     }
 
-    const orders = await orderService.getOrdersForRole(req.user._id.toString(), req.user.role);
+    const page = req.query.page ? Number(req.query.page) : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : undefined;
+    const search = req.query.search as string;
+    const status = req.query.status as string;
+
+    const orders = await orderService.getOrdersForRole(
+      req.user._id.toString(),
+      req.user.role,
+      page,
+      limit,
+      search,
+      status
+    );
 
     res.status(200).json({
       success: true,

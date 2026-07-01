@@ -211,10 +211,27 @@ const handleAddToCart = async () => {
             </button>
           </div>
 
-          <div class="seller-info">
-            <span class="seller-label">Curated by</span>
-            <span class="seller-name">{{ product.seller?.fullName || 'Curio Studio' }}</span>
+          <div class="seller-card">
+            <div class="seller-card-header">
+              <img 
+                v-if="product.seller?.storeLogoUrl" 
+                :src="product.seller.storeLogoUrl" 
+                alt="Store Logo" 
+                class="seller-logo-img" 
+              />
+              <div v-else class="seller-logo-placeholder">
+                {{ (product.seller?.storeName || product.seller?.fullName || 'C')[0].toUpperCase() }}
+              </div>
+              <div class="seller-card-meta">
+                <span class="seller-label">Curated by</span>
+                <span class="seller-name">{{ product.seller?.storeName || product.seller?.fullName || 'Curio Studio' }}</span>
+              </div>
+            </div>
+            <p v-if="product.seller?.storeDescription" class="seller-desc">
+              {{ product.seller.storeDescription }}
+            </p>
           </div>
+
         </div>
       </div>
 
@@ -284,6 +301,28 @@ const handleAddToCart = async () => {
               </div>
             </div>
             <p class="review-comment">{{ review.comment }}</p>
+
+            <!-- Seller Response sub-block -->
+            <div v-if="review.sellerReply" class="seller-reply-bubble">
+              <div class="reply-header-row">
+                <div class="seller-identity">
+                  <img 
+                    v-if="product?.seller?.storeLogoUrl" 
+                    :src="product.seller.storeLogoUrl" 
+                    class="seller-avatar-img" 
+                    alt="Seller Logo" 
+                  />
+                  <span v-else class="seller-avatar-initial">
+                    {{ (product?.seller?.storeName || product?.seller?.fullName || 'S').charAt(0).toUpperCase() }}
+                  </span>
+                  <span class="seller-badge-title">
+                    {{ product?.seller?.storeName || product?.seller?.fullName || 'Studio response' }}
+                  </span>
+                </div>
+                <span class="response-tag">Response</span>
+              </div>
+              <p class="reply-body-text">{{ review.sellerReply }}</p>
+            </div>
           </li>
         </ul>
       </section>
@@ -834,4 +873,145 @@ const handleAddToCart = async () => {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Seller Card Styles */
+.seller-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-top: 12px;
+  text-align: left;
+}
+
+.seller-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.seller-logo-img {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  object-fit: contain;
+  border: 1px solid var(--color-border);
+  background-color: #fff;
+}
+
+.seller-logo-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-alt);
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
+  border: 1px solid var(--color-border);
+}
+
+.seller-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.seller-label {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.seller-name {
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  font-weight: 750;
+  color: var(--color-primary);
+}
+
+.seller-desc {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  color: var(--color-text-light);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Seller Review Response Styles */
+.seller-reply-bubble {
+  background-color: var(--color-bg-alt);
+  border-left: 3px solid var(--color-primary);
+  padding: 12px 16px;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  margin-top: 12px;
+  text-align: left;
+}
+
+.reply-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.seller-identity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.seller-avatar-img {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+}
+
+.seller-avatar-initial {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.seller-badge-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.response-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background-color: rgba(15, 61, 94, 0.08);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.reply-body-text {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--color-text);
+  margin: 0;
+}
 </style>
+

@@ -39,7 +39,7 @@ const adminMenu = [
 
 const sellerMenu = [
   { name: 'Dashboard', path: '/seller/dashboard', icon: LayoutDashboard },
-  { name: 'Products', path: '/admin/products', icon: Package }, 
+  { name: 'Products', path: '/seller/products', icon: Package }, 
   { name: 'Inventory', path: '/seller/inventory', icon: Archive },
   { name: 'Orders', path: '/seller/orders', icon: ShoppingBag },
   { name: 'Reviews', path: '/seller/reviews', icon: Star },

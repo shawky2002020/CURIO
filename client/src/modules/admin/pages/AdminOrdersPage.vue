@@ -3,6 +3,7 @@
  * AdminOrdersPage
  * Administrative Order Management dashboard.
  * Uses BaseTable, BasePagination, BaseModal, and BaseConfirmDialog.
+ * Enhanced with backend pagination and orders stats insights cards.
  */
 import { ref, onMounted, watch } from 'vue';
 import { adminApi, type OrderRegistryItem } from '../../../api/admin.api.js';
@@ -25,6 +26,7 @@ import BaseTable from '../../../components/ui/BaseTable.vue';
 import BaseModal from '../../../components/ui/BaseModal.vue';
 import BaseConfirmDialog from '../../../components/ui/BaseConfirmDialog.vue';
 import BaseSelect from '../../../components/ui/BaseSelect.vue';
+import BasePagination from '../../../components/ui/BasePagination.vue';
 
 const toastStore = useToastStore();
 
@@ -58,6 +60,24 @@ const statusOptions = [
   { label: 'Cancelled', value: 'cancelled' },
 ];
 
+// Pagination & Stats
+const pagination = ref({
+  page: 1,
+  limit: 10,
+  total: 0,
+  pages: 1,
+});
+
+const stats = ref({
+  total: 0,
+  pending: 0,
+  confirmed: 0,
+  processing: 0,
+  shipped: 0,
+  delivered: 0,
+  cancelled: 0,
+});
+
 // Detail Modal state
 const showViewModal = ref(false);
 const activeOrder = ref<OrderRegistryItem | null>(null);
@@ -70,14 +90,30 @@ const confirmDialogVariant = ref<'primary' | 'danger' | 'warning'>('primary');
 const confirmDialogLoading = ref(false);
 const onConfirmCallback = ref<(() => Promise<void>) | null>(null);
 
-const fetchOrders = async () => {
+const fetchOrders = async (page = 1) => {
   loading.value = true;
   error.value = null;
   try {
-    const response = await adminApi.fetchOrders();
+    const response = await adminApi.fetchOrders({
+      page,
+      limit: pagination.value.limit,
+      search: search.value,
+      status: statusFilter.value,
+    });
     if (response.success && response.data) {
-      orders.value = response.data;
-      applyFilters();
+      if (response.data.orders) {
+        orders.value = response.data.orders;
+        filteredOrders.value = response.data.orders;
+        pagination.value.total = response.data.total;
+        pagination.value.pages = response.data.pages;
+        pagination.value.page = response.data.page;
+        if (response.data.stats) {
+          stats.value = response.data.stats;
+        }
+      } else {
+        orders.value = response.data;
+        filteredOrders.value = response.data;
+      }
     }
   } catch (err: any) {
     error.value = err?.response?.data?.message || 'Failed to retrieve order history.';
@@ -86,52 +122,20 @@ const fetchOrders = async () => {
   }
 };
 
-const applyFilters = () => {
-  let list = [...orders.value];
-
-  // Filter by Status
-  if (statusFilter.value) {
-    list = list.filter((o) => o.status === statusFilter.value);
-  }
-
-  // Filter by Search Keyword (Order Number or Customer Name)
-  if (search.value.trim()) {
-    const term = search.value.trim().toLowerCase();
-    list = list.filter((o) => {
-      const orderIdMatch = o._id.toLowerCase().includes(term);
-      const customerNameMatch = o.shippingAddress.fullName.toLowerCase().includes(term);
-      const emailMatch = o.shippingAddress.email.toLowerCase().includes(term);
-      
-      // Comma-separated sellers match
-      const sellersStr = getSellersText(o).toLowerCase();
-      const sellersMatch = sellersStr.includes(term);
-      
-      return orderIdMatch || customerNameMatch || emailMatch || sellersMatch;
-    });
-  }
-
-  filteredOrders.value = list;
-};
-
-// Watchers
+let debounceTimeout: any = null;
 watch([search, statusFilter], () => {
-  applyFilters();
+  if (debounceTimeout) clearTimeout(debounceTimeout);
+  debounceTimeout = setTimeout(() => {
+    fetchOrders(1);
+  }, 350);
 });
 
 onMounted(() => {
-  fetchOrders();
+  fetchOrders(1);
 });
 
-// Helper: format unique list of sellers for an order
-const getSellersText = (order: OrderRegistryItem): string => {
-  const sellers = new Set<string>();
-  order.items.forEach((item) => {
-    const sellerName = item.productId?.seller?.fullName;
-    if (sellerName) {
-      sellers.add(sellerName);
-    }
-  });
-  return sellers.size > 0 ? Array.from(sellers).join(', ') : 'CURIO Gallery';
+const handlePageChange = (newPage: number) => {
+  fetchOrders(newPage);
 };
 
 const formatDate = (dateStr: string): string => {
@@ -156,13 +160,29 @@ const statusBadgeClass = (status: string): string => {
   return mapping[status] || 'badge-default';
 };
 
-const paymentBadgeClass = (status: string): string => {
+const paymentBadgeClass = (status?: string): string => {
+  const s = status || 'pending';
   const mapping: Record<string, string> = {
     pending: 'badge-pending',
     paid: 'badge-paid',
     failed: 'badge-failed',
   };
-  return mapping[status] || 'badge-default';
+  return mapping[s] || 'badge-default';
+};
+
+const getSellersList = (order: OrderRegistryItem): string[] => {
+  if (!order.items) return [];
+  const sellers = new Set<string>();
+  order.items.forEach((item) => {
+    const seller = item.productId?.seller;
+    if (seller && typeof seller === 'object' && seller.fullName) {
+      sellers.add(seller.fullName);
+    } else if (item.image) {
+      // Fallback
+      sellers.add('Studio Partner');
+    }
+  });
+  return Array.from(sellers);
 };
 
 const openViewModal = (order: OrderRegistryItem) => {
@@ -196,7 +216,7 @@ const handleConfirmAction = async () => {
       await onConfirmCallback.value();
       showConfirmDialog.value = false;
     } catch (err) {
-      // Errors handled in callback
+      // Handled in callback
     } finally {
       confirmDialogLoading.value = false;
       onConfirmCallback.value = null;
@@ -208,20 +228,26 @@ const handleConfirmCancel = () => {
   onConfirmCallback.value = null;
 };
 
-// Moderation Operations
 const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
   const variant = newStatus === 'cancelled' ? 'danger' : 'primary';
+  const labelMap: Record<string, string> = {
+    confirmed: 'Accept/Confirm',
+    cancelled: 'Cancel',
+    processing: 'Processing',
+    shipped: 'Shipped',
+    delivered: 'Delivered',
+  };
 
   triggerConfirm(
-    'Update Order Status',
-    `Are you sure you want to change the status of Order #${order._id.substring(18)} to "${newStatus}"?`,
+    `${labelMap[newStatus] || 'Update'} Order`,
+    `Are you sure you want to mark Order #${order._id.substring(18).toUpperCase()} as "${newStatus}"?`,
     variant,
     async () => {
       try {
         const response = await adminApi.updateOrderStatus(order._id, newStatus);
         if (response.success) {
-          toastStore.success(`Order advanced to status: ${newStatus}.`);
-          fetchOrders();
+          toastStore.success(`Order status advanced to: ${newStatus}`);
+          fetchOrders(pagination.value.page);
         }
       } catch (err: any) {
         const msg = err?.response?.data?.message || 'Failed to update order status.';
@@ -237,11 +263,43 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
   <div class="admin-orders-page">
     <!-- Header -->
     <header class="page-header">
-      <div>
-        <h1 class="page-title">Order Management</h1>
-        <p class="page-subtitle">Track payments, advance logistics statuses, and manage fulfillment.</p>
+      <div class="title-wrap">
+        <h1 class="page-title">Manage Orders</h1>
+        <p class="page-subtitle">Track receipts, check payments, and audit seller fulfillment logistics.</p>
       </div>
     </header>
+
+    <!-- Statistics Insights Cards -->
+    <section class="insights-stats-row" v-if="stats.total > 0">
+      <div class="stat-card">
+        <span class="stat-card-label">Total Orders</span>
+        <strong class="stat-card-value">{{ stats.total }}</strong>
+      </div>
+      <div class="stat-card stat-card--pending">
+        <span class="stat-card-label">Pending</span>
+        <strong class="stat-card-value">{{ stats.pending }}</strong>
+      </div>
+      <div class="stat-card stat-card--confirmed">
+        <span class="stat-card-label">Confirmed</span>
+        <strong class="stat-card-value">{{ stats.confirmed }}</strong>
+      </div>
+      <div class="stat-card stat-card--processing">
+        <span class="stat-card-label">Processing</span>
+        <strong class="stat-card-value">{{ stats.processing }}</strong>
+      </div>
+      <div class="stat-card stat-card--shipped">
+        <span class="stat-card-label">Shipped</span>
+        <strong class="stat-card-value">{{ stats.shipped }}</strong>
+      </div>
+      <div class="stat-card stat-card--delivered">
+        <span class="stat-card-label">Delivered</span>
+        <strong class="stat-card-value">{{ stats.delivered }}</strong>
+      </div>
+      <div class="stat-card stat-card--cancelled">
+        <span class="stat-card-label">Cancelled</span>
+        <strong class="stat-card-value">{{ stats.cancelled }}</strong>
+      </div>
+    </section>
 
     <!-- Toolbar Filters -->
     <section class="controls-toolbar">
@@ -250,7 +308,7 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
         <input
           v-model="search"
           type="text"
-          placeholder="Search by Order #, Customer, or Seller..."
+          placeholder="Search by Buyer Name, Email, or Order Reference ID..."
           class="search-input-box"
         />
       </div>
@@ -260,12 +318,12 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
       </div>
     </section>
 
-    <!-- Error -->
+    <!-- Error state -->
     <div v-if="error" class="error-banner">
       <AlertTriangle class="error-icon" />
-      <h3>Failed to load orders history</h3>
+      <h3>Failed to load orders</h3>
       <p>{{ error }}</p>
-      <button class="retry-btn" @click="fetchOrders">Retry</button>
+      <button class="retry-btn" @click="fetchOrders(1)">Retry</button>
     </div>
 
     <!-- Orders Table -->
@@ -274,24 +332,31 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
         :headers="tableHeaders"
         :items="filteredOrders"
         :loading="loading"
-        emptyText="No Curation Orders Found"
+        emptyText="No orders found"
       >
         <!-- Cell: Order Number -->
         <template #cell(orderNumber)="{ item }">
-          <span class="order-id-label">#{{ item._id.substring(18) }}</span>
+          <span class="order-id-label" @click="openViewModal(item)">
+            #{{ item._id.substring(18).toUpperCase() }}
+          </span>
         </template>
 
         <!-- Cell: Customer -->
         <template #cell(customer)="{ item }">
           <div class="customer-info-cell">
             <span class="customer-name">{{ item.shippingAddress.fullName }}</span>
-            <span class="customer-email">{{ item.shippingAddress.email }}</span>
+            <span class="customer-email" v-if="item.userId">{{ item.userId.email }}</span>
+            <span class="customer-email" v-else>{{ item.shippingAddress.email }}</span>
           </div>
         </template>
 
         <!-- Cell: Sellers -->
         <template #cell(sellers)="{ item }">
-          <span class="sellers-text">{{ getSellersText(item) }}</span>
+          <div class="sellers-cell-list">
+            <span v-for="seller in getSellersList(item)" :key="seller" class="seller-tag">
+              {{ seller }}
+            </span>
+          </div>
         </template>
 
         <!-- Cell: Amount -->
@@ -324,7 +389,7 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
         <!-- Cell: Actions -->
         <template #cell(actions)="{ item }">
           <div class="actions-buttons">
-            <button class="action-btn" title="View Order Breakdown" @click="openViewModal(item)">
+            <button class="action-btn" title="View Details" @click="openViewModal(item)">
               <Eye class="action-icon" />
             </button>
 
@@ -342,7 +407,7 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
             <button
               v-if="item.status === 'confirmed'"
               class="action-btn action-process"
-              title="Start Processing"
+              title="Mark Processing"
               @click="handleStatusUpdate(item, 'processing')"
             >
               <PackageCheck class="action-icon" />
@@ -352,7 +417,7 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
             <button
               v-if="item.status === 'processing'"
               class="action-btn action-ship"
-              title="Ship Package"
+              title="Mark Shipped"
               @click="handleStatusUpdate(item, 'shipped')"
             >
               <Truck class="action-icon" />
@@ -368,7 +433,7 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
               <CheckCircle class="action-icon" />
             </button>
 
-            <!-- Cancel -->
+            <!-- cancel -->
             <button
               v-if="item.status !== 'delivered' && item.status !== 'cancelled'"
               class="action-btn action-cancel"
@@ -380,10 +445,18 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
           </div>
         </template>
       </BaseTable>
+
+      <div class="orders-pagination-wrap" v-if="pagination.pages > 1">
+        <BasePagination
+          :currentPage="pagination.page"
+          :totalPages="pagination.pages"
+          @change="handlePageChange"
+        />
+      </div>
     </template>
 
     <!-- MODAL: View Order Details -->
-    <BaseModal :show="showViewModal" title="Order Curation Breakdown" size="lg" @close="closeModals">
+    <BaseModal :show="showViewModal" title="Order Management Sheet" size="lg" @close="closeModals">
       <div v-if="activeOrder" class="details-modal-grid">
         <!-- Panel 1: Customer Details -->
         <div class="details-section shadow-section">
@@ -394,15 +467,15 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
               <span class="read-value">{{ activeOrder.shippingAddress.fullName }}</span>
             </div>
             <div class="read-group">
-              <span class="read-label">Contact Email</span>
+              <span class="read-label">Email Address</span>
               <span class="read-value">{{ activeOrder.shippingAddress.email }}</span>
             </div>
             <div class="read-group">
-              <span class="read-label">Contact Phone</span>
+              <span class="read-label">Phone Number</span>
               <span class="read-value">{{ activeOrder.shippingAddress.phone }}</span>
             </div>
             <div class="read-group read-group--full">
-              <span class="read-label">Shipping Address</span>
+              <span class="read-label">Destination Address</span>
               <span class="read-value">
                 {{ activeOrder.shippingAddress.address }}, {{ activeOrder.shippingAddress.city }},
                 {{ activeOrder.shippingAddress.country }} (ZIP: {{ activeOrder.shippingAddress.postalCode }})
@@ -411,25 +484,17 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
           </div>
         </div>
 
-        <!-- Panel 2: Order Metadata & Status -->
+        <!-- Panel 2: Logistics & Payment -->
         <div class="details-section shadow-section">
-          <h3 class="details-section-title"><Calendar class="section-icon" /> Logistics & Payment</h3>
+          <h3 class="details-section-title"><Calendar class="section-icon" /> Logistics & Auditing</h3>
           <div class="details-read-grid">
             <div class="read-group">
-              <span class="read-label">Order Number</span>
-              <span class="read-value mono">#{{ activeOrder._id }}</span>
-            </div>
-            <div class="read-group">
-              <span class="read-label">Order Date</span>
+              <span class="read-label">Order Created</span>
               <span class="read-value">{{ formatDate(activeOrder.createdAt) }}</span>
             </div>
             <div class="read-group">
-              <span class="read-label">Fulfillment Status</span>
-              <span class="read-value">
-                <span :class="['status-badge', statusBadgeClass(activeOrder.status)]">
-                  {{ activeOrder.status }}
-                </span>
-              </span>
+              <span class="read-label">Payment Method</span>
+              <span class="read-value uppercase-val">{{ activeOrder.paymentMethod === 'cash' ? 'Cash on Arrival (COD)' : 'Stripe Card' }}</span>
             </div>
             <div class="read-group">
               <span class="read-label">Payment Status</span>
@@ -437,73 +502,79 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
                 <span :class="['status-badge', paymentBadgeClass(activeOrder.paymentStatus)]">
                   {{ activeOrder.paymentStatus }}
                 </span>
-                <span class="method-text"> via {{ activeOrder.paymentMethod === 'cash' ? 'Cash on Arrival' : 'Card' }}</span>
+              </span>
+            </div>
+            <div class="read-group">
+              <span class="read-label">Global Status</span>
+              <span class="read-value">
+                <span :class="['status-badge', statusBadgeClass(activeOrder.status)]">
+                  {{ activeOrder.status }}
+                </span>
               </span>
             </div>
           </div>
         </div>
 
-        <!-- Panel 3: Items Breakdown -->
-        <div class="details-section details-section--full shadow-section">
-          <h3 class="details-section-title"><ShoppingBag class="section-icon" /> Curation Items List</h3>
-          
-          <div class="items-invoice-table-wrap">
-            <table class="invoice-table">
-              <thead>
-                <tr>
-                  <th>Product</th>
-                  <th>Seller Partner</th>
-                  <th class="text-center">Price</th>
-                  <th class="text-center">Qty</th>
-                  <th class="text-right">Subtotal</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="item in activeOrder.items" :key="item.productId?._id">
-                  <td>
-                    <div class="invoice-product-cell">
-                      <img v-if="item.image" :src="item.image" class="invoice-thumb" alt="Product" />
-                      <span>{{ item.name }}</span>
+        <!-- Panel 3: Order Items Table -->
+        <div class="details-section shadow-section details-section--full">
+          <h3 class="details-section-title"><ShoppingBag class="section-icon" /> Ordered Items Audit</h3>
+          <table class="details-items-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Price</th>
+                <th class="text-center">Qty</th>
+                <th class="text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in activeOrder.items" :key="item.productId?._id || item.name">
+                <td>
+                  <div class="product-cell-detail">
+                    <img v-if="item.image" :src="item.image" class="product-cell-thumb" alt="Product" />
+                    <div class="product-meta-cell">
+                      <span class="product-cell-name">{{ item.name }}</span>
+                      <span class="product-cell-seller" v-if="item.productId?.seller">
+                        Studio: {{ item.productId.seller.fullName }}
+                      </span>
                     </div>
-                  </td>
-                  <td>{{ item.productId?.seller?.fullName || 'CURIO Gallery' }}</td>
-                  <td class="text-center">${{ item.price.toFixed(2) }}</td>
-                  <td class="text-center">{{ item.quantity }}</td>
-                  <td class="text-right font-mono">${{ (item.price * item.quantity).toFixed(2) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                  </div>
+                </td>
+                <td class="font-mono">${{ item.price.toFixed(2) }}</td>
+                <td class="text-center">{{ item.quantity }}</td>
+                <td class="text-right font-mono">${{ (item.price * item.quantity).toFixed(2) }}</td>
+              </tr>
+            </tbody>
+          </table>
 
-          <!-- Invoice Summary Totals -->
-          <div class="invoice-totals-wrapper">
-            <div class="totals-breakdown">
-              <div class="totals-row">
-                <span>Subtotal</span>
-                <span>${{ activeOrder.totals.subtotal.toFixed(2) }}</span>
-              </div>
-              <div v-if="activeOrder.totals.discount > 0" class="totals-row totals-row--discount">
-                <span>Discount ({{ activeOrder.promoCode || 'PROMO' }})</span>
-                <span>-${{ activeOrder.totals.discount.toFixed(2) }}</span>
-              </div>
-              <div class="totals-row">
-                <span>Shipping Costs</span>
-                <span>${{ activeOrder.totals.shipping.toFixed(2) }}</span>
-              </div>
-              <div class="totals-row">
-                <span>Registry Tax (10%)</span>
-                <span>${{ activeOrder.totals.tax.toFixed(2) }}</span>
-              </div>
-              <div class="totals-row totals-row--grand">
-                <span>Grand Total</span>
-                <span>${{ activeOrder.totals.total.toFixed(2) }}</span>
-              </div>
+          <!-- Totals Row -->
+          <div class="receipt-divider"></div>
+          <div class="totals-breakdown-box">
+            <div class="totals-line">
+              <span>Subtotal:</span>
+              <span class="font-mono">${{ activeOrder.totals.subtotal.toFixed(2) }}</span>
+            </div>
+            <div class="totals-line" v-if="activeOrder.totals.discount > 0">
+              <span>Promo Code Discount:</span>
+              <span class="font-mono text-danger">-${{ activeOrder.totals.discount.toFixed(2) }}</span>
+            </div>
+            <div class="totals-line">
+              <span>Shipping Fee:</span>
+              <span class="font-mono">${{ activeOrder.totals.shipping.toFixed(2) }}</span>
+            </div>
+            <div class="totals-line">
+              <span>Taxes (10%):</span>
+              <span class="font-mono">${{ activeOrder.totals.tax.toFixed(2) }}</span>
+            </div>
+            <div class="totals-line totals-line--grand">
+              <span>Grand Total:</span>
+              <span class="font-mono">${{ activeOrder.totals.total.toFixed(2) }}</span>
             </div>
           </div>
         </div>
       </div>
       <template #footer>
-        <button class="close-modal-btn" @click="closeModals">Close Receipt</button>
+        <button class="close-modal-btn" @click="closeModals">Close Sheet</button>
       </template>
     </BaseModal>
 
@@ -523,13 +594,13 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
 <style scoped>
 .admin-orders-page {
   padding: 32px;
-  max-width: 1400px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
-/* Page Header */
 .page-header {
-  margin-bottom: 32px;
+  margin-bottom: 28px;
+  text-align: left;
 }
 
 .page-title {
@@ -548,71 +619,165 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
   margin: 0;
 }
 
-/* Controls Toolbar */
-.controls-toolbar {
+/* Statistics Insights cards banner */
+.insights-stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.01);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.03);
+}
+
+.stat-card-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.stat-card-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-text-h);
+}
+
+.stat-card--pending {
+  border-left: 4px solid #d97706;
+}
+.stat-card--confirmed {
+  border-left: 4px solid #0284c7;
+}
+.stat-card--processing {
+  border-left: 4px solid #7c3aed;
+}
+.stat-card--shipped {
+  border-left: 4px solid #f59e0b;
+}
+.stat-card--delivered {
+  border-left: 4px solid #059669;
+}
+.stat-card--cancelled {
+  border-left: 4px solid #dc2626;
+}
+
+/* Toolbar filters */
+.controls-toolbar {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 16px;
   margin-bottom: 24px;
-  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .controls-toolbar {
+    grid-template-columns: 1fr;
+  }
 }
 
 .search-input-wrap {
   position: relative;
-  flex: 1;
-  max-width: 450px;
+  width: 100%;
 }
 
 .search-icon {
   position: absolute;
-  left: 16px;
+  left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   color: var(--color-muted);
-  pointer-events: none;
 }
 
 .search-input-box {
   width: 100%;
-  padding: 12px 16px 12px 48px;
+  padding: 12px 16px 12px 42px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
   background-color: var(--color-surface);
-  color: var(--color-text);
+  color: var(--color-text-h);
+  font-family: var(--font-sans);
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
   box-sizing: border-box;
 }
 
 .search-input-box:focus {
   outline: none;
-  border-color: var(--color-accent);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(15, 61, 94, 0.1);
 }
 
 .filter-select-wrap {
-  min-width: 200px;
+  width: 100%;
 }
 
-/* Table formats */
+.error-banner {
+  background-color: #fef2f2;
+  border: 1px solid #fee2e2;
+  padding: 32px;
+  border-radius: var(--radius-lg);
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.error-icon {
+  width: 48px;
+  height: 48px;
+  color: var(--color-danger);
+  margin-bottom: 12px;
+}
+
+.retry-btn {
+  background-color: var(--color-danger);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  margin-top: 12px;
+  cursor: pointer;
+}
+
 .order-id-label {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.order-id-label:hover {
+  text-decoration: underline;
 }
 
 .customer-info-cell {
   display: flex;
   flex-direction: column;
-  gap: 2px;
   text-align: left;
 }
 
 .customer-name {
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-h);
 }
 
 .customer-email {
@@ -620,221 +785,132 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
   color: var(--color-muted);
 }
 
-.sellers-text {
+.sellers-cell-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-start;
+}
+
+.seller-tag {
+  background-color: var(--color-bg-alt);
+  border: 1px solid var(--color-border);
+  color: var(--color-primary);
+  font-size: 0.75rem;
   font-weight: 600;
-  max-width: 250px;
-  display: inline-block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
 }
 
 .payment-info-cell {
   display: flex;
   flex-direction: column;
-  gap: 4px;
   align-items: flex-start;
+  gap: 4px;
 }
 
 .payment-method-desc {
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   color: var(--color-muted);
-  font-weight: 600;
 }
 
 .date-cell {
+  font-size: 0.85rem;
   color: var(--color-muted);
 }
 
-/* Status badges */
-.status-badge {
-  font-size: 0.75rem;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: var(--radius-full);
-  text-transform: capitalize;
-  display: inline-block;
-}
-
-.badge-pending {
-  background-color: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
-}
-
-.badge-confirmed {
-  background-color: rgba(99, 102, 241, 0.1);
-  color: #6366f1;
-}
-
-.badge-processing {
-  background-color: rgba(30, 41, 59, 0.1);
-  color: #1e293b;
-}
-
-.badge-shipped {
-  background-color: rgba(14, 165, 233, 0.1);
-  color: #0ea5e9;
-}
-
-.badge-delivered {
-  background-color: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-}
-
-.badge-cancelled {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-}
-
-.badge-paid {
-  background-color: rgba(16, 185, 129, 0.1);
-  color: #10b981;
-}
-
-.badge-failed {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
-}
-
-/* Actions list */
 .actions-buttons {
-  display: inline-flex;
-  gap: 8px;
+  display: flex;
   justify-content: flex-end;
+  gap: 6px;
 }
 
 .action-btn {
   background: none;
   border: 1px solid var(--color-border);
   padding: 6px;
-  border-radius: var(--radius-md);
-  color: var(--color-muted);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
+  color: var(--color-text);
+  transition: all 0.2s ease;
 }
 
 .action-btn:hover {
   background-color: var(--color-bg-alt);
-  color: var(--color-text);
-  border-color: var(--color-muted);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .action-confirm:hover {
-  border-color: #6366f1;
-  color: #6366f1;
-  background-color: rgba(99, 102, 241, 0.05);
+  color: #10b981;
+  border-color: #10b981;
 }
 
 .action-process:hover {
-  border-color: #1e293b;
-  color: #1e293b;
-  background-color: rgba(30, 41, 59, 0.05);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .action-ship:hover {
-  border-color: #0ea5e9;
-  color: #0ea5e9;
-  background-color: rgba(14, 165, 233, 0.05);
+  color: #f59e0b;
+  border-color: #f59e0b;
 }
 
 .action-deliver:hover {
-  border-color: #10b981;
   color: #10b981;
-  background-color: rgba(16, 185, 129, 0.05);
+  border-color: #10b981;
 }
 
 .action-cancel:hover {
-  border-color: #ef4444;
-  color: #ef4444;
-  background-color: rgba(239, 68, 68, 0.05);
+  color: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
 .action-icon {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
-/* Error Banner */
-.error-banner {
-  text-align: center;
-  padding: 80px 24px;
+/* Pagination container */
+.orders-pagination-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
 }
 
-.error-icon {
-  width: 48px;
-  height: 48px;
-  color: #ef4444;
-  margin-bottom: 16px;
-}
-
-.error-banner h3 {
-  font-family: var(--font-heading);
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0 0 8px 0;
-}
-
-.error-banner p {
-  font-family: var(--font-sans);
-  color: var(--color-muted);
-  margin: 0 0 24px 0;
-}
-
-.retry-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  background-color: var(--color-primary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-
-.retry-btn:hover {
-  opacity: 0.9;
-}
-
-/* Details Modal Receipt layout */
+/* Modal layout details */
 .details-modal-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  text-align: left;
+}
+
+@media (max-width: 768px) {
+  .details-modal-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .details-section {
-  border: 1px solid var(--color-border);
   background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: 20px;
-  box-sizing: border-box;
-}
-
-.shadow-section {
-  box-shadow: var(--shadow-soft);
+  padding: 24px;
 }
 
 .details-section--full {
-  grid-column: span 2;
+  grid-column: 1 / -1;
 }
 
 .details-section-title {
-  font-family: var(--font-heading);
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--color-primary);
   display: flex;
   align-items: center;
   gap: 8px;
+  font-family: var(--font-heading);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text-h);
   margin: 0 0 20px 0;
   border-bottom: 1px solid var(--color-border);
   padding-bottom: 10px;
@@ -843,14 +919,13 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
 .section-icon {
   width: 18px;
   height: 18px;
-  color: var(--color-accent);
+  color: var(--color-primary);
 }
 
 .details-read-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr;
   gap: 16px;
-  text-align: left;
 }
 
 .read-group {
@@ -859,158 +934,183 @@ const handleStatusUpdate = (order: OrderRegistryItem, newStatus: any) => {
   gap: 4px;
 }
 
-.read-group--full {
-  grid-column: span 2;
-}
-
 .read-label {
-  font-family: var(--font-sans);
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--color-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.read-value {
-  font-family: var(--font-sans);
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--color-text);
-  line-height: 1.4;
-}
-
-.read-value.mono {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.78rem;
-}
-
-.method-text {
-  font-size: 0.8rem;
-  color: var(--color-muted);
-}
-
-/* Invoice list */
-.items-invoice-table-wrap {
-  width: 100%;
-  overflow-x: auto;
-}
-
-.invoice-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-.invoice-table th {
-  padding: 10px 12px;
-  font-family: var(--font-sans);
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--color-muted);
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.read-value {
+  font-size: 0.95rem;
+  color: var(--color-text-h);
+  font-weight: 600;
+}
+
+.uppercase-val {
+  text-transform: uppercase;
+}
+
+.details-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.details-items-table th {
+  background-color: var(--color-bg-alt);
+  color: var(--color-muted);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 10px 12px;
+  text-align: left;
   border-bottom: 2px solid var(--color-border);
 }
 
-.invoice-table td {
+.details-items-table td {
   padding: 12px;
-  font-family: var(--font-sans);
-  font-size: 0.85rem;
   border-bottom: 1px solid var(--color-border);
-  vertical-align: middle;
+  font-size: 0.9rem;
 }
 
-.invoice-product-cell {
+.product-cell-detail {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
-.invoice-thumb {
+.product-cell-thumb {
   width: 40px;
   height: 40px;
-  border-radius: var(--radius-sm);
   object-fit: cover;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
 }
 
-.text-center {
-  text-align: center;
-}
-
-.text-right {
-  text-align: right;
-}
-
-.font-mono {
-  font-family: var(--font-mono, monospace);
-}
-
-/* Totals panel */
-.invoice-totals-wrapper {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 20px;
-}
-
-.totals-breakdown {
+.product-meta-cell {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  min-width: 280px;
 }
 
-.totals-row {
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--font-sans);
-  font-size: 0.88rem;
+.product-cell-name {
+  font-weight: 700;
+  color: var(--color-text-h);
+}
+
+.product-cell-seller {
+  font-size: 0.75rem;
   color: var(--color-muted);
 }
 
-.totals-row--discount {
-  color: #10b981;
+.receipt-divider {
+  border-top: 2px dashed var(--color-border);
+  margin: 20px 0;
 }
 
-.totals-row--grand {
-  border-top: 2px dashed var(--color-border);
+.totals-breakdown-box {
+  width: 320px;
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.totals-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.totals-line--grand {
+  border-top: 1px solid var(--color-border);
   padding-top: 10px;
-  margin-top: 4px;
-  font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1.1rem;
+  font-weight: 800;
   color: var(--color-primary);
 }
 
-.totals-row--grand span:last-child {
-  font-size: 1.15rem;
-  color: var(--color-accent);
-  font-family: var(--font-mono, monospace);
-}
-
 .close-modal-btn {
-  padding: 10px 18px;
-  border-radius: var(--radius-md);
-  font-family: var(--font-sans);
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
   background-color: var(--color-surface);
   color: var(--color-text);
   border: 1px solid var(--color-border);
-  box-sizing: border-box;
+  padding: 10px 24px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .close-modal-btn:hover {
   background-color: var(--color-bg-alt);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
-@media (max-width: 768px) {
-  .details-modal-grid {
-    grid-template-columns: 1fr;
-  }
-  .details-section {
-    grid-column: span 1;
-  }
+/* Badges CSS standard */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.badge-pending {
+  background-color: #fef3c7;
+  color: #d97706;
+}
+
+.badge-confirmed {
+  background-color: #e0f2fe;
+  color: #0284c7;
+}
+
+.badge-processing {
+  background-color: #f3e8ff;
+  color: #7c3aed;
+}
+
+.badge-shipped {
+  background-color: #fffbeb;
+  color: #d97706;
+}
+
+.badge-delivered {
+  background-color: #d1fae5;
+  color: #059669;
+}
+
+.badge-cancelled {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.badge-paid {
+  background-color: #d1fae5;
+  color: #059669;
+}
+
+.badge-failed {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.text-center {
+  text-align: center !important;
+}
+
+.text-right {
+  text-align: right !important;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
 }
 </style>

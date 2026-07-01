@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../../utils/asyncHandler.js';
 import { adminService } from './admin.service.js';
+import { productService } from '../products/product.service.js';
 
 class AdminController {
   /**
@@ -174,6 +175,39 @@ class AdminController {
       success: true,
       message: 'Platform settings updated successfully.',
       data,
+    });
+  });
+
+  /**
+   * GET /api/admin/products
+   * Retrieves all product listings on the platform.
+   */
+  public getProducts = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { search, categoryId, status, stockStatus } = req.query;
+    const products = await productService.getAll({
+      search: search as string,
+      categoryId: categoryId as string,
+      status: (status as string) || 'all',
+      stockStatus: stockStatus as any,
+    });
+    res.status(200).json({
+      success: true,
+      message: 'Platform products retrieved.',
+      data: products,
+    });
+  });
+
+  /**
+   * PATCH /api/admin/products/:id/archive
+   * Moderation action: force archive a seller's product.
+   */
+  public archiveProduct = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { id } = req.params;
+    const product = await productService.update(id, '', 'admin', { status: 'archived' });
+    res.status(200).json({
+      success: true,
+      message: 'Product archived by administrator.',
+      data: product,
     });
   });
 }

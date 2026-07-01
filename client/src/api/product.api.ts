@@ -47,8 +47,8 @@ export const categoryApi = {
 // ─── Products ────────────────────────────────────────────────────────────────
 
 export const productApi = {
-  async getAll(filters?: ProductFilters): Promise<ApiResponse<Product[]>> {
-    const response = await http.get<ApiResponse<Product[]>>('/products', { params: filters });
+  async getAll(filters?: ProductFilters): Promise<ApiResponse<any>> {
+    const response = await http.get<ApiResponse<any>>('/products', { params: filters });
     return response.data;
   },
 

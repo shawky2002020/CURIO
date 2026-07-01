@@ -18,5 +18,17 @@ export const userApi = {
     const response = await http.delete<ApiResponse<void>>('/users/me');
     return response.data;
   },
+
+  async uploadLogo(file: File): Promise<ApiResponse<{ logoUrl: string }>> {
+    const formData = new FormData();
+    formData.append('logo', file);
+    const response = await http.post<ApiResponse<{ logoUrl: string }>>('/seller/upload-logo', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };
 export default userApi;
+

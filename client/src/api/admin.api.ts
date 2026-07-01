@@ -1,5 +1,6 @@
 import { http } from './http.js';
 import type { ApiResponse } from '../types/api.types.js';
+import type { Product } from '../types/product.types.js';
 
 export interface DashboardStats {
   customers: number;
@@ -76,6 +77,12 @@ export interface PaginatedUsersData {
   total: number;
   pages: number;
   page: number;
+  stats?: {
+    totalCustomers: number;
+    activeCustomers: number;
+    totalSellers: number;
+    activeSellers: number;
+  };
 }
 
 export interface SellerRegistryItem {
@@ -86,6 +93,8 @@ export interface SellerRegistryItem {
   status: 'active' | 'blocked' | 'deleted';
   createdAt: string;
   productsCount: number;
+  storeName?: string;
+  storeDescription?: string;
 }
 
 export interface PaginatedSellersData {
@@ -93,6 +102,12 @@ export interface PaginatedSellersData {
   total: number;
   pages: number;
   page: number;
+  stats?: {
+    totalCustomers: number;
+    activeCustomers: number;
+    totalSellers: number;
+    activeSellers: number;
+  };
 }
 
 export interface OrderItem {
@@ -149,6 +164,7 @@ export interface ReviewRegistryItem {
   _id: string;
   rating: number;
   comment: string;
+  sellerReply?: string;
   status: 'active' | 'hidden';
   createdAt: string;
   user: {
@@ -213,9 +229,27 @@ export interface PlatformSettings {
   freeShippingThreshold: number;
   shippingCost: number;
   contactEmail: string;
+  lowStockThreshold: number;
 }
 
 export const adminApi = {
+  async fetchAllProducts(params?: {
+    search?: string;
+    categoryId?: string;
+    status?: string;
+    stockStatus?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<any>> {
+    const response = await http.get<ApiResponse<any>>('/admin/products', { params });
+    return response.data;
+  },
+
+  async archiveProduct(id: string): Promise<ApiResponse<Product>> {
+    const response = await http.patch<ApiResponse<Product>>(`/admin/products/${id}/archive`);
+    return response.data;
+  },
+
   async fetchDashboardData(): Promise<ApiResponse<DashboardData>> {
     const response = await http.get<ApiResponse<DashboardData>>('/admin/dashboard');
     return response.data;
@@ -260,8 +294,8 @@ export const adminApi = {
     limit?: number;
     search?: string;
     status?: string;
-  }): Promise<ApiResponse<OrderRegistryItem[]>> {
-    const response = await http.get<ApiResponse<OrderRegistryItem[]>>('/orders', { params });
+  }): Promise<ApiResponse<any>> {
+    const response = await http.get<ApiResponse<any>>('/orders', { params });
     return response.data;
   },
 

@@ -14,9 +14,21 @@ export interface User {
   provider: AuthProvider;
   status: UserStatus;
   lastLoginAt?: string;
+  storeName?: string;
+  storeDescription?: string;
+  storeAddress?: {
+    street: string;
+    city: string;
+    state?: string;
+    country: string;
+    postalCode: string;
+  };
+  storeLogoUrl?: string;
+  storePhone?: string;
   createdAt: string;
   updatedAt: string;
 }
+
 
 export interface AuthResponse {
   user: User;

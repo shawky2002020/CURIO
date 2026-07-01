@@ -280,35 +280,104 @@ export class OrderService {
     return order;
   }
 
-  /**
-   * Retrieves order history based on user role (Customers see their own, Sellers see their products, Admins see all).
-   */
-  public async getOrdersForRole(userId: string, role: string): Promise<IOrder[]> {
-    if (role === 'admin') {
-      return await Order.find({})
-        .populate('userId', 'fullName email')
-        .populate({
-          path: 'items.productId',
-          select: 'name seller',
-          populate: {
-            path: 'seller',
-            select: 'fullName'
-          }
-        })
-        .sort({ createdAt: -1 });
-    }
+  public async getOrdersForRole(
+    userId: string,
+    role: string,
+    page?: number,
+    limit: number = 10,
+    search?: string,
+    status?: string
+  ): Promise<any> {
+    const query: Record<string, any> = {};
 
     if (role === 'seller') {
-      // Find all product IDs owned by this seller
       const sellerProductIds = await Product.find({ seller: new Types.ObjectId(userId) }).distinct('_id');
-      // Find orders containing any of those product IDs
-      return await Order.find({ 'items.productId': { $in: sellerProductIds } })
-        .populate('userId', 'fullName email')
-        .sort({ createdAt: -1 });
+      query['items.productId'] = { $in: sellerProductIds };
+    } else if (role !== 'admin') {
+      query.userId = new Types.ObjectId(userId);
     }
 
-    // Customer / Collector
-    return await Order.find({ userId: new Types.ObjectId(userId) }).sort({ createdAt: -1 });
+    // Apply filters before pagination/statistics
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+
+    if (search) {
+      const searchRegex = { $regex: search, $options: 'i' };
+      const orConditions: any[] = [
+        { 'shippingAddress.fullName': searchRegex },
+        { 'shippingAddress.email': searchRegex }
+      ];
+      if (Types.ObjectId.isValid(search)) {
+        orConditions.push({ _id: new Types.ObjectId(search) });
+      }
+      query.$or = orConditions;
+    }
+
+    // 1. Calculate statistics matching the core role query (exclude page status & search filter to keep counts global for dashboard)
+    const statsQuery = { ...query };
+    delete statsQuery.status;
+    delete statsQuery.$or;
+
+    const statusCounts = await Order.aggregate([
+      { $match: statsQuery },
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+
+    const stats = {
+      total: 0,
+      pending: 0,
+      confirmed: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0
+    };
+
+    statusCounts.forEach((sc) => {
+      if (sc._id === 'pending') stats.pending = sc.count;
+      else if (sc._id === 'confirmed') stats.confirmed = sc.count;
+      else if (sc._id === 'processing') stats.processing = sc.count;
+      else if (sc._id === 'shipped') stats.shipped = sc.count;
+      else if (sc._id === 'delivered') stats.delivered = sc.count;
+      else if (sc._id === 'cancelled') stats.cancelled = sc.count;
+    });
+    stats.total = stats.pending + stats.confirmed + stats.processing + stats.shipped + stats.delivered + stats.cancelled;
+
+    // 2. Perform query
+    let ordersQuery = Order.find(query)
+      .populate('userId', 'fullName email')
+      .populate({
+        path: 'items.productId',
+        select: 'name seller',
+        populate: {
+          path: 'seller',
+          select: 'fullName storeName storeLogoUrl'
+        }
+      })
+      .sort({ createdAt: -1 });
+
+    if (page !== undefined) {
+      const skip = (page - 1) * limit;
+      ordersQuery = ordersQuery.skip(skip).limit(limit);
+    }
+
+    const orders = await ordersQuery;
+
+    if (page !== undefined) {
+      const total = await Order.countDocuments(query);
+      const pages = Math.ceil(total / limit);
+      return {
+        orders,
+        total,
+        pages,
+        page,
+        limit,
+        stats
+      };
+    }
+
+    return orders;
   }
 
   /**
@@ -328,6 +397,93 @@ export class OrderService {
       throw new ApiError(404, 'Order not found.', 'ORDER_NOT_FOUND');
     }
 
+    // 1. Resolve unique seller IDs for all products in this order
+    const productIds = order.items.map((item) => item.productId);
+    const productsInOrder = await Product.find({ _id: { $in: productIds } });
+    const sellerIds = new Set(productsInOrder.map((p) => p.seller.toString()));
+    const isMultiSeller = sellerIds.size > 1;
+
+    // 2. Perform Seller-specific validations and operations
+    if (requestingUser.role === 'seller') {
+      // Check if seller owns any products in this order
+      const sellerProductIds = await Product.find({
+        seller: new Types.ObjectId(requestingUser._id),
+      }).distinct('_id');
+      const sellerProductStrIds = sellerProductIds.map((id) => id.toString());
+
+      const ownsProduct = order.items.some((item) =>
+        sellerProductStrIds.includes(item.productId.toString())
+      );
+
+      if (!ownsProduct) {
+        throw new ApiError(403, 'Forbidden. You do not own any products in this order.', 'FORBIDDEN');
+      }
+
+      // If it's a multi-seller order:
+      if (isMultiSeller) {
+        // Sellers cannot advance status (confirmed, processing, shipped, delivered) on multi-seller orders
+        if (status !== 'cancelled') {
+          throw new ApiError(
+            403,
+            'Forbidden. This order contains products from multiple sellers and its status can only be advanced by an administrator.',
+            'FORBIDDEN'
+          );
+        }
+
+        // If the seller is cancelling: remove ONLY their items and recalculate totals
+        if (status === 'cancelled') {
+          const sellerItems = order.items.filter((item) =>
+            sellerProductStrIds.includes(item.productId.toString())
+          );
+          const otherItems = order.items.filter(
+            (item) => !sellerProductStrIds.includes(item.productId.toString())
+          );
+
+          if (otherItems.length > 0) {
+            // Replenish stock for the seller's items only
+            for (const item of sellerItems) {
+              await Product.findByIdAndUpdate(item.productId, {
+                $inc: { stock: item.quantity },
+              });
+            }
+
+            // Remove the items from the order
+            order.items = otherItems;
+
+            // Recalculate totals
+            const newSubtotal = otherItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+            order.totals.subtotal = newSubtotal;
+            order.totals.tax = Math.round(newSubtotal * 0.1 * 100) / 100;
+            order.totals.total = Math.max(
+              0,
+              newSubtotal + order.totals.shipping + order.totals.tax - order.totals.discount
+            );
+
+            await order.save();
+
+            // Trigger notification email to customer
+            try {
+              const emailHtml = `
+                <div style="font-family: sans-serif; line-height: 1.5; color: #333;">
+                  <h2>Order Update</h2>
+                  <p>Dear Customer,</p>
+                  <p>Some items in your Order #${order._id.toString().substring(18).toUpperCase()} were cancelled by the studio partner.</p>
+                  <p>The remaining items are still active and being processed. Your new order total is <strong>$${order.totals.total.toFixed(2)}</strong>.</p>
+                  <p>Thank you for choosing CURIO.</p>
+                </div>
+              `;
+              await sendEmail(order.shippingAddress.email, `CURIO // Order Update #${order._id}`, emailHtml);
+            } catch (emailErr) {
+              console.error('[Email Error] Failed to send cancel portion notification:', emailErr);
+            }
+
+            return order;
+          }
+        }
+      }
+    }
+
+    // 3. Normal / Admin / Single-Seller Flow
     if (order.status === status) {
       return order;
     }
@@ -340,7 +496,7 @@ export class OrderService {
       order.paymentStatus = 'paid';
     }
 
-    // Handle inventory replenishment on cancellation
+    // Handle inventory replenishment on global cancellation
     if (status === 'cancelled' && previousStatus !== 'cancelled') {
       for (const item of order.items) {
         await Product.findByIdAndUpdate(item.productId, {
@@ -376,7 +532,7 @@ export class OrderService {
         path: 'items.productId',
         populate: {
           path: 'seller',
-          select: 'fullName email'
+          select: 'fullName email storeName storeLogoUrl'
         }
       });
     if (!order) {

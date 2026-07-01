@@ -9,15 +9,44 @@ export const useProductStore = defineStore('product', () => {
   const loading = ref(false);
   const error = ref<string | null>(null);
   const filters = ref<ProductFilters>({});
+  const pagination = ref({
+    page: 1,
+    limit: 12,
+    total: 0,
+    pages: 1,
+  });
+  const stats = ref({
+    total: 0,
+    active: 0,
+    draft: 0,
+    archived: 0,
+  });
 
   const fetchProducts = async (productFilters?: ProductFilters) => {
     loading.value = true;
     error.value = null;
-    if (productFilters !== undefined) filters.value = productFilters;
+    if (productFilters !== undefined) {
+      filters.value = { ...filters.value, ...productFilters };
+    }
     try {
-      const response = await productApi.getAll(filters.value);
+      const response = await productApi.getAll({
+        ...filters.value,
+        page: pagination.value.page,
+        limit: pagination.value.limit,
+      });
       if (response.success && response.data) {
-        products.value = response.data;
+        if (response.data.products) {
+          products.value = response.data.products;
+          pagination.value.total = response.data.total;
+          pagination.value.pages = response.data.pages;
+          pagination.value.page = response.data.page;
+          pagination.value.limit = response.data.limit;
+          if (response.data.stats) {
+            stats.value = response.data.stats;
+          }
+        } else {
+          products.value = response.data;
+        }
       }
     } catch (err: any) {
       error.value = err.response?.data?.message || 'Failed to fetch products';
@@ -100,6 +129,8 @@ export const useProductStore = defineStore('product', () => {
     loading,
     error,
     filters,
+    pagination,
+    stats,
     fetchProducts,
     fetchProduct,
     createProduct,

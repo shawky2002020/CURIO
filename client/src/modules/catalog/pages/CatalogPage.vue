@@ -9,6 +9,7 @@ import { http } from '../../../api/http.js';
 import ProductCard from '../components/ProductCard.vue';
 import ProductFilterBar from '../components/ProductFilterBar.vue';
 import BaseButton from '../../../components/ui/BaseButton.vue';
+import BasePagination from '../../../components/ui/BasePagination.vue';
 import { Sparkles, ChevronLeft, ChevronRight } from '@lucide/vue';
 
 const router = useRouter();
@@ -97,12 +98,22 @@ const handleFilterChange = (filters: {
   minPrice: string;
   maxPrice: string;
 }) => {
+  productStore.pagination.page = 1;
   productStore.fetchProducts({
     search: filters.search || undefined,
     categoryId: filters.categoryId || undefined,
     minPrice: filters.minPrice ? Number(filters.minPrice) : undefined,
     maxPrice: filters.maxPrice ? Number(filters.maxPrice) : undefined,
   });
+};
+
+const handlePageChange = async (newPage: number) => {
+  productStore.pagination.page = newPage;
+  await productStore.fetchProducts();
+  const catalogGrid = document.querySelector('.catalog-grid-section');
+  if (catalogGrid) {
+    catalogGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 };
 
 const resetAll = () => {
@@ -252,10 +263,26 @@ const getCategoryFallbackImage = (name: string) => {
         />
       </div>
     </section>
+
+    <!-- Catalog Pagination controls -->
+    <div class="catalog-pagination-wrap" v-if="productStore.pagination.pages > 1">
+      <BasePagination
+        :currentPage="productStore.pagination.page"
+        :totalPages="productStore.pagination.pages"
+        @change="handlePageChange"
+      />
+    </div>
   </div>
 </template>
 
 <style scoped>
+.catalog-pagination-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 48px;
+  margin-bottom: 32px;
+}
+
 .catalog-view {
   width: 100%;
 }

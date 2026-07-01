@@ -32,6 +32,14 @@ const totalPages = ref(1);
 const currentPage = ref(1);
 const limitPerPage = ref(10);
 
+// Demographics stats
+const stats = ref({
+  totalCustomers: 0,
+  activeCustomers: 0,
+  totalSellers: 0,
+  activeSellers: 0,
+});
+
 // Filters & Search
 const search = ref('');
 const roleFilter = ref('');
@@ -125,6 +133,9 @@ const fetchUsers = async (): Promise<void> => {
       users.value = response.data.users;
       totalUsers.value = response.data.total;
       totalPages.value = response.data.pages;
+      if (response.data.stats) {
+        stats.value = response.data.stats;
+      }
     }
   } catch (err: any) {
     error.value = err?.response?.data?.message || 'Failed to load user list.';
@@ -329,6 +340,26 @@ const clearFilters = () => {
         <p class="page-subtitle">Moderate roles, restrict logins, and audit registered accounts.</p>
       </div>
     </header>
+
+    <!-- Demographics/Insights Statistics Banner -->
+    <section class="insights-stats-row" v-if="stats.totalCustomers > 0 || stats.totalSellers > 0">
+      <div class="stat-card stat-card--collectors">
+        <span class="stat-card-label">Total Collectors</span>
+        <strong class="stat-card-value">{{ stats.totalCustomers }}</strong>
+      </div>
+      <div class="stat-card stat-card--active-collectors">
+        <span class="stat-card-label">Active Collectors</span>
+        <strong class="stat-card-value">{{ stats.activeCustomers }}</strong>
+      </div>
+      <div class="stat-card stat-card--studios">
+        <span class="stat-card-label">Total Studios</span>
+        <strong class="stat-card-value">{{ stats.totalSellers }}</strong>
+      </div>
+      <div class="stat-card stat-card--active-studios">
+        <span class="stat-card-label">Active Studios</span>
+        <strong class="stat-card-value">{{ stats.activeSellers }}</strong>
+      </div>
+    </section>
 
     <!-- Notification Toasts -->
     <Transition name="fade">
@@ -1097,5 +1128,59 @@ const clearFilters = () => {
     flex: 1;
     min-width: 180px;
   }
+}
+
+/* Statistics Insights cards banner */
+.insights-stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.01);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.03);
+}
+
+.stat-card-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.stat-card-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-text-h);
+}
+
+.stat-card--collectors {
+  border-left: 4px solid #6366f1;
+}
+.stat-card--active-collectors {
+  border-left: 4px solid #10b981;
+}
+.stat-card--studios {
+  border-left: 4px solid #3b82f6;
+}
+.stat-card--active-studios {
+  border-left: 4px solid #059669;
 }
 </style>

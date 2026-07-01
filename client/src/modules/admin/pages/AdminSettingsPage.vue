@@ -24,6 +24,7 @@ const form = ref({
   freeShippingThreshold: '100',
   shippingCost: '10',
   contactEmail: 'support@curio.com',
+  lowStockThreshold: '5',
 });
 
 const formErrors = ref<Record<string, string>>({});
@@ -39,6 +40,7 @@ const fetchSettings = async () => {
         freeShippingThreshold: String(response.data.freeShippingThreshold),
         shippingCost: String(response.data.shippingCost),
         contactEmail: response.data.contactEmail,
+        lowStockThreshold: String(response.data.lowStockThreshold),
       };
     }
   } catch (err: any) {
@@ -73,6 +75,11 @@ const validateForm = (): boolean => {
     errors.contactEmail = 'Please provide a valid support email address.';
   }
 
+  const lowStockVal = Number(form.value.lowStockThreshold);
+  if (form.value.lowStockThreshold.trim() === '' || isNaN(lowStockVal) || !Number.isInteger(lowStockVal) || lowStockVal < 1) {
+    errors.lowStockThreshold = 'Low stock threshold must be a positive integer greater than or equal to 1.';
+  }
+
   formErrors.value = errors;
   return Object.keys(errors).length === 0;
 };
@@ -87,6 +94,7 @@ const handleSaveSettings = async () => {
       freeShippingThreshold: Number(form.value.freeShippingThreshold),
       shippingCost: Number(form.value.shippingCost),
       contactEmail: form.value.contactEmail.trim(),
+      lowStockThreshold: Number(form.value.lowStockThreshold),
     };
 
     const response = await adminApi.updateSettings(payload);
@@ -97,6 +105,7 @@ const handleSaveSettings = async () => {
         freeShippingThreshold: String(response.data.freeShippingThreshold),
         shippingCost: String(response.data.shippingCost),
         contactEmail: response.data.contactEmail,
+        lowStockThreshold: String(response.data.lowStockThreshold),
       };
     }
   } catch (err: any) {
@@ -219,6 +228,26 @@ onMounted(() => {
             <span class="field-explanation">
               <HelpCircle class="info-inline-icon" />
               Address featured on customer invoice emails and order summary sheets.
+            </span>
+          </div>
+
+          <!-- Low Stock Threshold -->
+          <div class="form-group-item">
+            <div class="input-info-header">
+              <span class="input-title-badge">Inventory</span>
+            </div>
+            <BaseInput
+              id="lowStockThreshold"
+              label="Low Stock Threshold warning (units)"
+              v-model="form.lowStockThreshold"
+              placeholder="e.g. 5"
+              :error="formErrors.lowStockThreshold"
+              required
+              :disabled="saving"
+            />
+            <span class="field-explanation">
+              <HelpCircle class="info-inline-icon" />
+              Platform stock quantity warning threshold. Sellers will see low stock alerts at or below this value.
             </span>
           </div>
         </div>
