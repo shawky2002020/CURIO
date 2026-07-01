@@ -148,7 +148,7 @@ const statusColor = (status: string): string => {
     <header class="dashboard-header">
       <div class="welcome-section">
         <h1 class="page-title">Seller Studio</h1>
-        <p class="page-subtitle">Welcome back, {{ authStore.user?.fullName || 'Seller Partner' }}. Here is your studio performance.</p>
+        <p class="page-subtitle">Welcome back, {{ authStore.user?.storeName || authStore.user?.fullName || 'Seller Partner' }}. Here is your studio performance.</p>
       </div>
       <button class="sync-btn" @click="fetchDashboardData" :disabled="loading">
         <RefreshCw :class="['btn-icon', { 'spin-animation': loading }]" /> Sync Studio

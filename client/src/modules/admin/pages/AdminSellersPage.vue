@@ -255,8 +255,9 @@ const clearSearch = () => {
       >
         <!-- Cell: Store Name -->
         <template #cell(storeName)="{ item }">
-          <span class="store-name-text">{{ item.fullName }}'s Gallery</span>
+          <span class="store-name-text">{{ item.storeName || (item.fullName + "'s Gallery") }}</span>
         </template>
+
 
         <!-- Cell: Owner -->
         <template #cell(fullName)="{ item }">
@@ -353,8 +354,9 @@ const clearSearch = () => {
         </div>
         <div class="view-group">
           <span class="view-label">Store Registered Name</span>
-          <span class="view-value">{{ activeSeller.fullName }}'s Gallery</span>
+          <span class="view-value">{{ activeSeller.storeName || (activeSeller.fullName + "'s Gallery") }}</span>
         </div>
+
         <div class="view-group">
           <span class="view-label">Store Owner</span>
           <span class="view-value">{{ activeSeller.fullName }}</span>
