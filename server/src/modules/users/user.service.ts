@@ -18,16 +18,38 @@ export class UserService {
    * Updates profile fields.
    */
   public async updateProfile(userId: string, payload: UpdateProfilePayload): Promise<IUser> {
-    const { fullName, phone, avatarUrl } = payload;
+    const { 
+      fullName, 
+      phone, 
+      avatarUrl, 
+      storeName, 
+      storeDescription, 
+      storeAddress, 
+      storeLogoUrl, 
+      storePhone 
+    } = payload;
     const user = await this.getProfile(userId);
 
-    if (fullName) user.fullName = fullName;
-    if (phone) user.phone = phone;
-    if (avatarUrl) user.avatarUrl = avatarUrl;
+    if (fullName !== undefined) user.fullName = fullName;
+    if (phone !== undefined) user.phone = phone;
+    if (avatarUrl !== undefined) user.avatarUrl = avatarUrl;
+
+    // Check storeName updates for auditing and administrative notifications
+    if (storeName !== undefined && storeName !== user.storeName) {
+      console.log(`[AUDIT] User ${user._id} changed store name from "${user.storeName || ''}" to "${storeName}"`);
+      console.log(`[NOTIFICATION] System Admin notified: Seller ${user.fullName} (${user._id}) updated store name to "${storeName}"`);
+      user.storeName = storeName;
+    }
+
+    if (storeDescription !== undefined) user.storeDescription = storeDescription;
+    if (storeLogoUrl !== undefined) user.storeLogoUrl = storeLogoUrl;
+    if (storePhone !== undefined) user.storePhone = storePhone;
+    if (storeAddress !== undefined) user.storeAddress = storeAddress;
 
     await user.save();
     return user;
   }
+
 
   /**
    * Performs soft account deletion.

@@ -1,5 +1,13 @@
 import { Schema, model, Document } from 'mongoose';
 
+export interface IAddress {
+  street: string;
+  city: string;
+  state?: string;
+  country: string;
+  postalCode: string;
+}
+
 export interface IUser extends Document {
   fullName: string;
   email?: string;
@@ -13,9 +21,25 @@ export interface IUser extends Document {
   googleId?: string;
   status: 'active' | 'blocked' | 'deleted';
   lastLoginAt?: Date;
+  storeName?: string;
+  storeDescription?: string;
+  storeAddress?: IAddress;
+  storeLogoUrl?: string;
+  storePhone?: string;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const addressSchema = new Schema<IAddress>(
+  {
+    street: { type: String, required: true, trim: true },
+    city: { type: String, required: true, trim: true },
+    state: { type: String, trim: true },
+    country: { type: String, required: true, trim: true },
+    postalCode: { type: String, required: true, trim: true },
+  },
+  { _id: false }
+);
 
 const userSchema = new Schema<IUser>(
   {
@@ -74,6 +98,25 @@ const userSchema = new Schema<IUser>(
     lastLoginAt: {
       type: Date,
     },
+    storeName: {
+      type: String,
+      trim: true,
+    },
+    storeDescription: {
+      type: String,
+      trim: true,
+    },
+    storeAddress: {
+      type: addressSchema,
+    },
+    storeLogoUrl: {
+      type: String,
+      trim: true,
+    },
+    storePhone: {
+      type: String,
+      trim: true,
+    },
   },
   {
     timestamps: true,
@@ -83,3 +126,4 @@ const userSchema = new Schema<IUser>(
 
 
 export const User = model<IUser>('User', userSchema);
+
